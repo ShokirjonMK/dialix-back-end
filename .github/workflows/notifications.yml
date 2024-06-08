@@ -1,0 +1,60 @@
+name: Notifications
+on:
+  push:
+  pull_request:
+    types: ['opened', 'closed']
+jobs:
+  push_notification:
+    name: Push Notification
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram Push Message
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_ID }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          format: html
+          message: |
+            Event type: <b>PUSH</b>
+            <em>${{ github.actor }}</em> created commit on branch <em>${{ github.ref }}</em>
+            Repository: <em>${{ github.repository }}</em>
+            Commit message: <em>${{ github.event.head_commit.message }}</em>
+            See changes: https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+      - uses: actions/checkout@master
+  pull_request_notification_opened:
+    name: Pull Request Notification (Opened)
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram Pull Open Message
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_ID }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          format: html
+          message: |
+            Event type: <b>PULL REQUEST OPENED</b>
+            <em>${{ github.actor }}</em> opened a pull request
+            Repository: <em>${{ github.repository }}</em>
+            Title: <em>${{ github.event.pull_request.title }}</em>
+            See PR: ${{ github.event.pull_request.html_url }}
+      - uses: actions/checkout@master
+  pull_request_notification_closed:
+    name: Pull Request Notification (Closed)
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram Pull Close Message
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_ID }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          format: html
+          message: |
+            Event type: <b>PULL REQUEST CLOSED</b>
+            <em>${{ github.actor }}</em> closed a pull request
+            Repository: <em>${{ github.repository }}</em>
+            Title: <em>${{ github.event.pull_request.title }}</em>
+            See PR: ${{ github.event.pull_request.html_url }}
+            - uses: actions/checkout@master
