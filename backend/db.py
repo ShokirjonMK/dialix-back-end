@@ -269,6 +269,16 @@ def get_pending_audios(connection, owner_id: str):
 
 
 @db_connection_wrapper
+def get_count_of_records(connection, owner_id: str):
+    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+        cursor.execute(
+            "SELECT COUNT(*) FROM record WHERE owner_id = %s",
+            (owner_id,),
+        )
+        return dict(cursor.fetchone())
+
+
+@db_connection_wrapper
 def upsert_checklist(connection, checklist: dict):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         keys = [
