@@ -131,6 +131,12 @@ def read_users_me(current_user: User = Depends(get_current_user)):
     logging.warning("current_user: %s", current_user)
     return {"user": current_user}
 
+@app.get("/balance")
+def get_balance(current_user: User = Depends(get_current_user)):
+    balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0)
+    logging.warning("balance: %s", balance)
+    return {"balance": balance}
+
 
 @app.get("/balance")
 def get_balance(current_user: User = Depends(get_current_user)):
