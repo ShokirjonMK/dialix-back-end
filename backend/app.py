@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import FastAPI, Depends, HTTPException, status, Body
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from starlette.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.auth import (
     create_access_token,
@@ -25,6 +26,7 @@ from functools import wraps
 
 app = FastAPI()
 app.mount("/ws/", app=sio_app)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Set environment variables before importing TensorFlow or initializing tasks
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
@@ -130,6 +132,7 @@ def logout():
 def read_users_me(current_user: User = Depends(get_current_user)):
     logging.warning("current_user: %s", current_user)
     return {"user": current_user}
+
 
 @app.get("/balance")
 def get_balance(current_user: User = Depends(get_current_user)):
