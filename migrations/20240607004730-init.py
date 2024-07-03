@@ -26,7 +26,7 @@ def up(cursor: psycopg2.extensions.cursor):
                 id uuid PRIMARY KEY,
                 owner_id uuid NOT NULL,
                 title varchar NOT NULL,
-                duration real,
+                duration bigint,
                 payload jsonb,
                 operator_code varchar,
                 operator_name varchar,
