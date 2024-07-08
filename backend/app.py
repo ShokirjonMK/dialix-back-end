@@ -26,7 +26,6 @@ from functools import wraps
 
 app = FastAPI()
 app.mount("/ws/", app=sio_app)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Set environment variables before importing TensorFlow or initializing tasks
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
