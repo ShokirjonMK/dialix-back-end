@@ -7,7 +7,6 @@ from typing import Annotated
 from fastapi import FastAPI, Depends, HTTPException, status, Body
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from starlette.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 from backend.auth import (
     create_access_token,
