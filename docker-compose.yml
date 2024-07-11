@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.11.0-management
+    container_name: "rabbitmq"
+    restart: on-failure
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  redis:
+    image: redis:6
+    container_name: "redis"
+    restart: on-failure
+    ports:
+      - "6379:6379"
+
+  db:
+    image: postgres:16
+    container_name: postgres
+    restart: on-failure
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: dialix
+    ports:
+      - "5432:5432"
+
+  web:
+    build:
+        context: .
+        dockerfile: Dockerfile
+    container_name: web
+#    entrypoint: uvicorn backend.server:app --host 0.0.0.0 --port 8080 --workers 5 --reload
+    entrypoint: gunicorn backend.server:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8080 --reload
+    restart: on-failure
+    volumes:
+      - ./:/app
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+      - rabbitmq
+      - redis
+#      - api_worker
+#      - data_worker
+    environment:
+      AMQP_URL: ${AMQP_URL}
+      REDIS_URL: ${REDIS_URL}
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      MODEL_PATH: ${MODEL_PATH}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY}
+      AUTH_ALGORITHM: ${AUTH_ALGORITHM}
+      BASIC_AUTH_USERNAME: ${BASIC_AUTH_USERNAME}
+      BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
+
+  api_worker:
+    build:
+        context: .
+        dockerfile: Dockerfile
+    container_name: api_worker
+    entrypoint: celery -A workers.api worker --loglevel=info -Q api -c 1
+    restart: on-failure
+    volumes:
+      - ./:/app
+    depends_on:
+      - rabbitmq
+      - redis
+      - db
+    environment:
+      AMQP_URL: ${AMQP_URL}
+      REDIS_URL: ${REDIS_URL}
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      MODEL_PATH: ${MODEL_PATH}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_API_BASE: ${OPENAI_API_BASE}
+      OPENAI_API_TYPE: ${OPENAI_API_TYPE}
+      OPENAI_API_VERSION: ${OPENAI_API_VERSION}
+      MOHIRAI_API_KEY: ${MOHIRAI_API_KEY}
+      DEPLOYMENT_NAME: ${DEPLOYMENT_NAME}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
+
+  data_worker:
+    build:
+        context: .
+        dockerfile: Dockerfile
+    container_name: data_worker
+    entrypoint: celery -A workers.data worker --loglevel=info -Q data -c 1
+    restart: on-failure
+    volumes:
+      - ./:/app
+    depends_on:
+      - rabbitmq
+      - redis
+      - db
+    environment:
+      AMQP_URL: ${AMQP_URL}
+      REDIS_URL: ${REDIS_URL}
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      MODEL_PATH: ${MODEL_PATH}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
+
+volumes:
+  postgres:
