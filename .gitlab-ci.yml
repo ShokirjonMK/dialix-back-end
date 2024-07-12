@@ -1,0 +1,23 @@
+before_script:
+  - docker login $CI_REGISTRY --username $CI_REGISTRY_USER --password $CI_REGISTRY_PASSWORD
+
+stages:
+  - build
+  - deploy
+
+build_image:
+  stage: build
+  image: registry.gitlab.com/dialix1/dialix-back-end:docker
+  before_script:
+    - apk update && apk add git
+    - docker login $CI_REGISTRY --username $CI_REGISTRY_USER --password $CI_REGISTRY_PASSWORD
+    - eval $(ssh-agent -s)
+    - echo "$GITLAB_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - ssh-keyscan -t rsa gitlab.com >> ~/.ssh/known_hosts
+    - chmod 700 ~/.ssh
+  script:
+    - make build-image TAG=$CI_PIPELINE_IID SERVICE_NAME=$CI_PROJECT_NAME PROJECT_NAME=$CI_PROJECT_NAMESPACE REGISTRY=$CI_REGISTRY ENV_TAG=latest
+    - make push-image TAG=$CI_PIPELINE_IID SERVICE_NAME=$CI_PROJECT_NAME PROJECT_NAME=$CI_PROJECT_NAMESPACE REGISTRY=$CI_REGISTRY ENV_TAG=latest
+  only:
+    - main

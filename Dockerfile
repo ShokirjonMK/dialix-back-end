@@ -14,7 +14,8 @@ RUN pip install -r requirements.txt
 RUN useradd -m myuser
 USER myuser
 
-COPY backend /app/backend
-COPY migrations /app/migrations
-COPY uploads /app/uploads
-COPY workers /app/workers
+COPY . . 
+#COPY backend /app/backend
+#COPY migrations /app/migrations
+#COPY uploads /app/uploads
+#COPY workers /app/workers
