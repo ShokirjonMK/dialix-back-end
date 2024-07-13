@@ -31,6 +31,8 @@ deploy_image_prod:
     - mkdir -p ~/.ssh
     - ssh-keyscan -t rsa gitlab.com >> ~/.ssh/known_hosts
     - chmod 700 ~/.ssh
+    - curl ifconfig.me
+    - ssh root@34.89.199.177
     - cd /etc/systemd/system
   script:
     - sed -i 's\"$CI_REGISTRY"\"$CI_REGISTRY"/"$CI_PROJECT_NAMESPACE"/"$CI_PROJECT_NAME":"CI_PIPELINE_IID"\g' docker-web.service
