@@ -21,3 +21,19 @@ build_image:
     - make push-image TAG=$CI_PIPELINE_IID SERVICE_NAME=$CI_PROJECT_NAME PROJECT_NAME=$CI_PROJECT_NAMESPACE REGISTRY=$CI_REGISTRY ENV_TAG=latest
   only:
     - main
+
+deploy_image_prod:
+  image: registry.gitlab.com/dialix1/dialix-back-end:docker
+  stage: deploy
+  before_script:
+    - eval $(ssh-agent -s)
+    - echo "$GITLAB_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - ssh-keyscan -t rsa gitlab.com >> ~/.ssh/known_hosts
+    - chmod 700 ~/.ssh
+    - cd /etc/systemd/system
+  script:
+    - sed -i 's\"$CI_REGISTRY"\"$CI_REGISTRY"/"$CI_PROJECT_NAMESPACE"/"$CI_PROJECT_NAME":"CI_PIPELINE_IID"\g' docker-web.service
+  only:
+    - main
+
