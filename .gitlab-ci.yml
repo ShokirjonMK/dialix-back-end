@@ -35,7 +35,6 @@ deploy_image_prod:
     - echo "$CI_REGISTRY"
   script:
     #- ssh -o StrictHostKeyChecking=no -tt root@34.89.199.177 'sed -i `s~"$CI_REGISTRY"~"$CI_REGISTRY"/"$CI_PROJECT_NAMESPACE"/"$CI_PROJECT_NAME":"$CI_PIPELINE_IID"~g` /etc/systemd/system/docker-web.service && systemctl daemon-reload && systemctl restart docker-web'
-    - ssh -o StrictHostKeyChecking=no -tt root@34.89.199.177 "sed -i 's~\$CI_REGISTRY~\$CI_REGISTRY/\$CI_PROJECT_NAMESPACE/\$CI_PROJECT_NAME:\$CI_PIPELINE_IID~g' /etc/systemd/system/docker-web.service && systemctl daemon-reload && systemctl restart docker-web"
-  only:
+    - ssh -o StrictHostKeyChecking=no -tt root@34.89.199.177 "sed -i \"s~\$CI_REGISTRY~\$CI_REGISTRY/\$CI_PROJECT_NAMESPACE/\$CI_PROJECT_NAME:\$CI_PIPELINE_IID~g\" /etc/systemd/system/docker-web.service && systemctl daemon-reload && systemctl restart docker-web"
   only:
     - main
