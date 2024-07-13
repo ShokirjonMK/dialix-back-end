@@ -23,19 +23,16 @@ build_image:
     - main
 
 deploy_image_prod:
-  image: registry.gitlab.com/dialix1/dialix-back-end:docker
+  image: registry.gitlab.com/dialix/back-end:docker
   stage: deploy
   before_script:
     - eval $(ssh-agent -s)
     - echo "$GITLAB_PRIVATE_KEY" | tr -d '\r' | ssh-add -
     - mkdir -p ~/.ssh
-    - ssh-keyscan -t rsa gitlab.com >> ~/.ssh/known_hosts
+    - ssh-keyscan -t rsa 34.89.199.177 >> ~/.ssh/known_hosts
     - chmod 700 ~/.ssh
     - curl ifconfig.me
-    - ssh root@34.89.199.177
-    - cd /etc/systemd/system
   script:
-    - sed -i 's\"$CI_REGISTRY"\"$CI_REGISTRY"/"$CI_PROJECT_NAMESPACE"/"$CI_PROJECT_NAME":"CI_PIPELINE_IID"\g' docker-web.service
+    - ssh -t root@34.89.199.177 'cd /etc/systemd/system && sed -i "s/$CI_REGISTRY/$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_IID/" docker-web.service && systemctl restart docker-web'
   only:
     - main
-
