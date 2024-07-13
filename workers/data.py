@@ -1,6 +1,9 @@
 import asyncio
+import json
 import logging
 import os
+from psycopg2.extras import Json
+from celery import current_task
 
 import socketio
 
@@ -33,7 +36,6 @@ def upsert_data(self: PredictTask, *args, **kwargs):
     task_id = task["task_id"]
     result_id = task_id.split("/")[-1]
     record_id = task["record_id"]
-    checklist_id = task["checklist_id"]
     owner_id = task["owner_id"]
     is_success = task["is_success"]
     storage_id = task["storage_id"]
@@ -43,38 +45,30 @@ def upsert_data(self: PredictTask, *args, **kwargs):
     loop = asyncio.get_event_loop()
 
     existing_record = db.get_record_by_id(record_id, owner_id)
-    existing_result = db.get_result_by_id(result_id, owner_id)
+    existing_result = db.get_result_by_record_id(record_id, owner_id)
+    existing_result_id = existing_result.get("id", None) if existing_result else None
+    task_checklist_id = task.get("checklist_id", None)
+    checklist_id = task_checklist_id if task_checklist_id else (existing_result.get("checklist_id", None) if existing_result else None)
 
     task = AsyncResult(str(task_id), app=celery)
     task_status = str(task.status)
 
     if task and is_success and task_status == "SUCCESS":
         task_result = task.result
-        general_data = {
-            key: existing_result[key]
-            for key in keys_of_interest
-            if existing_result is not None and key in existing_result
-        }
+        general_data = {key: existing_result[key] for key in keys_of_interest if existing_result and key in existing_result}
 
-        existing_checklist_response = (
-            existing_result.get("checklist_response", {}) if existing_result else {}
-        )
+        existing_checklist_response = existing_result.get("checklist_result", {}) if existing_result else {}
+        general_response = task_result.get("general_response", general_data)
+        checklist_response = task_result.get("checklist_response") if task_result.get("checklist_response", None) else existing_checklist_response
 
-        general_response = task_result.get("general_response", {}) or general_data
-        checklist_response = (
-            task_result.get("checklist_response", {}) or existing_checklist_response
-        )
+        db.upsert_record(record={**existing_record, "status": "COMPLETED"})
 
-        db.upsert_record(
-            record={
-                **existing_record,
-                "status": "COMPLETED",
-            }
-        )
+        if isinstance(checklist_response, str):
+            checklist_response = json.loads(checklist_response.strip('`').strip('json').strip('\n'))
 
         db.upsert_result(
             result={
-                "id": str(result_id),
+                "id": str(existing_result_id if existing_result_id else result_id),
                 "owner_id": owner_id,
                 "record_id": record_id,
                 "checklist_id": checklist_id,
