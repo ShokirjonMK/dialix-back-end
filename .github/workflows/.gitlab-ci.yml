@@ -1,0 +1,27 @@
+stages:
+  - notify
+
+notify_on_push:
+  stage: notify
+  script:
+    - 'curl -X POST https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage -d chat_id=$TELEGRAM_CHAT_ID -d parse_mode=HTML -d text="Push event detected: Commit made by $GITLAB_USER_NAME on branch $CI_COMMIT_REF_NAME. Commit message: $CI_COMMIT_MESSAGE. [See changes]($CI_PROJECT_URL/commit/$CI_COMMIT_SHA)"'
+  only:
+    - pushes
+
+notify_on_merge_request_open:
+  stage: notify
+  script:
+    - 'curl -X POST https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage -d chat_id=$TELEGRAM_CHAT_ID -d parse_mode=HTML -d text="Merge Request Opened: Created by $GITLAB_USER_NAME. Title: $CI_COMMIT_TITLE. [See MR]($CI_PROJECT_URL/merge_requests)"'
+  only:
+    - merge_requests
+  when: on_success
+
+notify_on_merge_request_close:
+  stage: notify
+  script:
+    - 'curl -X POST https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage -d chat_id=$TELEGRAM_CHAT_ID -d parse_mode=HTML -d text="Merge Request Closed: Closed by $GITLAB_USER_NAME. Title: $CI_COMMIT_TITLE. [See MR]($CI_PROJECT_URL/merge_requests)"'
+  only:
+    - merge_requests
+  when: on_success
+  status:
+    - success
