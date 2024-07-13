@@ -33,6 +33,6 @@ deploy_image_prod:
     - chmod 700 ~/.ssh
     - echo "$GITLAB_PRIVATE_KEY" > ~/.ssh/id_rsa
   script:
-    - ssh -o StrictHostKeyChecking=no -tt root@34.89.199.177 'ls -la && cd /etc/systemd/system && sed -i `s\"$CI_REGISTRY"\"$CI_REGISTRY"/"$CI_PROJECT_NAMESPACE"/"$CI_PROJECT_NAME":"$CI_PIPELINE_IID"\g` docker-web.service && systemctl daemon-reload && systemctl restart docker-web'
+    - ssh -o StrictHostKeyChecking=no -tt root@34.89.199.177 'ls -la && cd /etc/systemd/system && sed -i 's~"$CI_REGISTRY"~"$CI_REGISTRY"/"$CI_PROJECT_NAMESPACE"/"$CI_PROJECT_NAME":"$CI_PIPELINE_IID"~g' docker-web.service && systemctl daemon-reload && systemctl restart docker-web'
   only:
     - main
