@@ -32,7 +32,8 @@ deploy_image_prod:
     - ssh-keyscan -t rsa 34.89.199.177 >> ~/.ssh/known_hosts
     - chmod 700 ~/.ssh
     - curl ifconfig.me
+    - echo "$GITLAB_PUBLIC_KEY" > ~/.ssh/server.pub
   script:
-    - ssh -t root@34.89.199.177 -i "$GITLAB_PUBLIC_KEY" 'cd /etc/systemd/system && sed -i "s/$CI_REGISTRY/$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_IID/" docker-web.service && systemctl daemon-reload && systemctl restart docker-web'
+    - ssh -t root@34.89.199.177 -i ~/.ssh/server.pub 'cd /etc/systemd/system && sed -i "s/$CI_REGISTRY/$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_IID/" docker-web.service && systemctl daemon-reload && systemctl restart docker-web'
   only:
     - main
