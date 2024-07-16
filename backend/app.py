@@ -35,7 +35,7 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 origins = ["http://localhost:3000", "http://34.89.199.177", "https://34.89.199.177", "http://localhost:8080", "*"]
 
 app.add_middleware(
-    Type[CORSMiddleware],
+    CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
