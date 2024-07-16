@@ -471,10 +471,8 @@ def activate_checklist(
 @app.get("/checklists")
 def get_list_of_checklists(current_user: User = Depends(get_current_user)):
     data = db.get_checklists(owner_id=str(current_user.id))
-    if data:
-        data = adapt_json(data)
-        return JSONResponse(status_code=200, content=data)
-    return JSONResponse(status_code=404, content={"error": "Not found"})
+    data = adapt_json(data)
+    return JSONResponse(status_code=200, content=data)
 
 
 @app.get("/checklist/{checklist_id}")
