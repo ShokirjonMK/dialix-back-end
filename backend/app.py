@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Type
 
 from fastapi import FastAPI, Depends, HTTPException, status, Body
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -32,11 +32,11 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 
-origins = ["http://localhost:3000", "*"]
+origins = ["http://localhost:3000"]
 
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
+    Type[CORSMiddleware],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
