@@ -34,8 +34,8 @@ deploy_image_prod:
     - echo "$GITLAB_PRIVATE_KEY" > ~/.ssh/id_rsa
     - echo "$CI_REGISTRY"
   script:
-    - ssh -o StrictHostKeyChecking=no -tt root@34.89.199.177 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_IID\\\\\" ' /etc/systemd/system/docker-web.service && systemctl daemon-reload && systemctl restart docker-web"
-    - ssh -o StrictHostKeyChecking=no -tt root@34.89.199.177 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_IID\\\\\" ' /etc/systemd/system/docker-api-worker.service && systemctl daemon-reload && systemctl restart docker-api-worker"
-    - ssh -o StrictHostKeyChecking=no -tt root@34.89.199.177 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_IID\\\\\" ' /etc/systemd/system/docker-data-worker.service && systemctl daemon-reload && systemctl restart docker-data-worker"
+    - ssh -o StrictHostKeyChecking=no -tt root@34.89.199.177 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_IID\ " \\\\ ' /etc/systemd/system/docker-web.service && systemctl daemon-reload && systemctl restart docker-web"
+    - ssh -o StrictHostKeyChecking=no -tt root@34.89.199.177 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_IID\ " \\\\ ' /etc/systemd/system/docker-api-worker.service && systemctl daemon-reload && systemctl restart docker-api-worker"
+    - ssh -o StrictHostKeyChecking=no -tt root@34.89.199.177 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_IID\ " \\\\ ' /etc/systemd/system/docker-data-worker.service && systemctl daemon-reload && systemctl restart docker-data-worker"
   only:
     - main
