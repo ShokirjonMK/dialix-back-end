@@ -87,7 +87,7 @@ def _get_stream_url(
 
 
 get_stream_url = cache.cache(
-    ttl=60 * 60 * 48, limit=0, namespace=os.getenv("STORAGE_REDIS_KEY", "storage")
+    ttl=60 * 60 * 24, limit=0, namespace=os.getenv("STORAGE_REDIS_KEY", "storage")
 )(_get_stream_url)
 
 
