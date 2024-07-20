@@ -4,7 +4,6 @@ import os
 import uuid
 import shutil
 import backend.db as db
-from datetime import datetime, timedelta
 from typing import Annotated, List, Tuple, Union
 from fastapi import Depends, Body, UploadFile, Request, HTTPException
 from fastapi.responses import JSONResponse
@@ -18,6 +17,9 @@ from backend.schemas import User, CheckList, ReprocessRecord
 from celery.result import AsyncResult
 from workers.data import upsert_data
 
+import datetime
+from datetime import datetime, timedelta
+
 
 def get_task_id(user_id):
     task_id = f"{user_id}/{uuid.uuid4()}"
@@ -28,41 +30,48 @@ def get_object_storage_id(extension):
     return f"{uuid.uuid4()}.{extension}"
 
 
-def calculate_satisfaction_difference_last_and_current_month(data):
-    last_month = []
-    current_month = []
-    current_date = datetime.now()
+def calculate_daily_satisfaction(data):
+    # Get the current date and the start dates for the last and current months
+    current_date = datetime.now().date()
     last_month_start = (current_date.replace(day=1) - timedelta(days=1)).replace(day=1)
+    end_of_last_month = (current_date.replace(day=1) - timedelta(days=1))
     current_month_start = current_date.replace(day=1)
+    end_of_current_month = (current_month_start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
 
-    # Distribute data into the respective month lists
+    # Initialize dictionaries to hold satisfaction counts for each day
+    last_month_satisfaction = {}
+    current_month_satisfaction = {}
+
+    # Generate string formatted dates for keys
+    last_month_days = [(last_month_start + timedelta(days=i)).strftime("%Y-%m-%d") for i in range((end_of_last_month - last_month_start).days + 1)]
+    current_month_days = [(current_month_start + timedelta(days=i)).strftime("%Y-%m-%d") for i in range((end_of_current_month - current_month_start).days + 1)]
+
+    for day in last_month_days:
+        last_month_satisfaction[day] = 0
+    for day in current_month_days:
+        current_month_satisfaction[day] = 0
+
+    # Distribute satisfaction counts into the respective dictionaries
     for entry in data:
-        date_of_result = datetime.strptime(
-            entry["result_created_at"], "%Y-%m-%dT%H:%M:%S.%f"
-        )
-        if last_month_start <= date_of_result < current_month_start:
-            last_month.append(entry)
-        elif date_of_result >= current_month_start:
-            current_month.append(entry)
+        date_of_result = datetime.strptime(entry["result_created_at"], "%Y-%m-%dT%H:%M:%S.%f").date()
+        date_str = date_of_result.strftime("%Y-%m-%d")
+        if entry["is_customer_satisfied"]:
+            if last_month_start <= date_of_result <= end_of_last_month:
+                if date_str in last_month_satisfaction:
+                    last_month_satisfaction[date_str] += 1
+                else:
+                    logging.warning(f"Date {date_str} is out of expected range for last month.")
+            elif current_month_start <= date_of_result <= end_of_current_month:
+                if date_str in current_month_satisfaction:
+                    current_month_satisfaction[date_str] += 1
+                else:
+                    logging.warning(f"Date {date_str} is out of expected range for current month.")
 
-    def satisfaction_rates(entries):
-        total = len(entries)
-        satisfied_count = sum(1 for entry in entries if entry["is_customer_satisfied"])
-        unsatisfied_count = total - satisfied_count
-        satisfaction_rate = (satisfied_count / total if total else 0) * 100
-        unsatisfaction_rate = (unsatisfied_count / total if total else 0) * 100
-        return satisfaction_rate, unsatisfaction_rate
-
-    last_month_rates = satisfaction_rates(last_month)
-    current_month_rates = satisfaction_rates(current_month)
-
+    # Return the daily satisfaction rates
     return {
-        "last_month_satisfaction_rate": last_month_rates[0],
-        "last_month_unsatisfaction_rate": last_month_rates[1],
-        "current_month_satisfaction_rate": current_month_rates[0],
-        "current_month_unsatisfaction_rate": current_month_rates[1],
+        "last_month_daily_satisfaction": last_month_satisfaction,
+        "current_month_daily_satisfaction": current_month_satisfaction,
     }
-
 
 async def process_form_data(request: Request):
     form = await request.form()
@@ -108,8 +117,9 @@ async def process_form_data(request: Request):
 
     if total_price > balance:
         for file in processed_files:
-            if os.path.exists(file["file"].filename):
-                os.remove(file["file"].filename)
+            logging.warning(f"Removing file: {file['file']}")
+            if os.path.exists(file["file"].split("/")[-1]):
+                os.remove(file["file"].split("/")[-1])
         raise HTTPException(status_code=400, detail="Not enough balance")
 
     if len(files) != len(general) or len(files) != len(checklist_id):
@@ -412,7 +422,7 @@ def results(current_user: User = Depends(get_current_user)):
     female_count = sum(1 for item in data if item["customer_gender"] == "female")
 
     satisfaction_rate_by_month = (
-        calculate_satisfaction_difference_last_and_current_month(data)
+        calculate_daily_satisfaction(data)
     )
 
     return JSONResponse(
@@ -444,6 +454,7 @@ def upsert_checklist(
     data: CheckList,
     current_user: User = Depends(get_current_user),
 ):
+    logging.warning(f"Checklist data: {data}")
     id = str(data.id)
     title = data.title
     payload = json.dumps(data.payload)
