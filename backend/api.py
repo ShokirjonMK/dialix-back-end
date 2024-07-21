@@ -73,6 +73,7 @@ def calculate_daily_satisfaction(data):
         "current_month_daily_satisfaction": current_month_satisfaction,
     }
 
+
 async def process_form_data(request: Request):
     form = await request.form()
     current_user = get_current_user(request)
@@ -80,6 +81,7 @@ async def process_form_data(request: Request):
     general = [gen == "true" for gen in form.getlist("general")]
     checklist_id = [chk if chk else None for chk in form.getlist("checklist_id")]
     balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0)
+    balance = balance if balance is not None else 0
     total_price = 0
     processed_files = []
 
@@ -101,7 +103,7 @@ async def process_form_data(request: Request):
 
         processed_files.append(
             {
-                "file": file_path,
+                "file_path": file_path,
                 "duration": duration,
             }
         )
@@ -117,9 +119,8 @@ async def process_form_data(request: Request):
 
     if total_price > balance:
         for file in processed_files:
-            logging.warning(f"Removing file: {file['file']}")
-            if os.path.exists(file["file"].split("/")[-1]):
-                os.remove(file["file"].split("/")[-1])
+            if os.path.exists(file["file_path"]):
+                os.remove(file["file_path"])
         raise HTTPException(status_code=400, detail="Not enough balance")
 
     if len(files) != len(general) or len(files) != len(checklist_id):
@@ -228,8 +229,8 @@ def analyze_data(
         record_id = str(uuid.uuid4())
         owner_id = str(current_user.id)
         status = "UPLOADED" if general is False and checklist_id is None else "PENDING"
-        storage_id = processed_file["file"].split("/")[-1]
-        file_path = processed_file["file"]
+        storage_id = processed_file["file_path"].split("/")[-1]
+        file_path = processed_file["file_path"]
         duration = processed_file["duration"]
         bucket = os.getenv("STORAGE_BUCKET_NAME", "dialixai-production")
 
@@ -454,7 +455,6 @@ def upsert_checklist(
     data: CheckList,
     current_user: User = Depends(get_current_user),
 ):
-    logging.warning(f"Checklist data: {data}")
     id = str(data.id)
     title = data.title
     payload = json.dumps(data.payload)
