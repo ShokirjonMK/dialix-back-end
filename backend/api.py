@@ -407,7 +407,7 @@ def results(current_user: User = Depends(get_current_user)):
     )
 
     average_delay = (total_delay / len(data)) / 1000
-    average_duration = total_duration / len(data)
+    average_duration = total_duration / len(data) / 60 / 1000
 
     satisfied_count = sum(1 for item in data if item["is_customer_satisfied"])
     unsatisfied_count = len(data) - satisfied_count
