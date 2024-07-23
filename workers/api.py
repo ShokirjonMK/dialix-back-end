@@ -113,6 +113,7 @@ def api_processing(self: PredictTask, **kwargs):
     checklist_id = task.get("checklist_id", None)
     general = task.get("general")
     record_payload = record.get("payload", {})
+    folder_name = task.get("folder_name", "")
 
     if not task or not record:
         logging.error("Task data is not provided")
@@ -121,7 +122,7 @@ def api_processing(self: PredictTask, **kwargs):
     file_path = os.path.join("uploads", record["storage_id"])
     if not os.path.exists(file_path):
         bucket = os.getenv("STORAGE_BUCKET_NAME", "dialixai-production")
-        remote_path = f"mohirdev/{record['storage_id']}"
+        remote_path = f"{folder_name}/{record['storage_id']}"
         if not file_exists(remote_path):
             logging.error(f"File not found in the storage: {remote_path}")
             raise Exception(f"File not found in the storage: {remote_path}")

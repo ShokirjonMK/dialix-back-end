@@ -136,9 +136,10 @@ def get_audio_and_results(current_user: User = Depends(get_current_user)):
     audios_with_checklist = []
     general_audios = []
     full_audios = []
+    folder_name = current_user.company_name.lower().replace(" ", "_")
     for record in recordings:
         result = db.get_result_by_record_id(record["id"], owner_id=str(current_user.id))
-        audio_url = get_stream_url(f"mohirdev/{record['storage_id']}")
+        audio_url = get_stream_url(f"{folder_name}/{record['storage_id']}")
         record["audio_url"] = audio_url
         if result:
             summary = result.get("summary", None)
@@ -234,8 +235,10 @@ def analyze_data(
         duration = processed_file["duration"]
         bucket = os.getenv("STORAGE_BUCKET_NAME", "dialixai-production")
 
-        upload_file(bucket, f"mohirdev/{storage_id}", file_path)
+        folder_name = current_user.company_name.lower().replace(" ", "_")
 
+        upload_file(bucket, f"{folder_name}/{storage_id}", file_path)
+        logging.warning(f"folder_name: {folder_name} storage_id: {storage_id}, bucket: {bucket}")
         task_id = get_task_id(user_id=current_user.id)
 
         record = {
@@ -282,6 +285,7 @@ def analyze_data(
                     "audio_record": audio_record,
                     "checklist_id": checklist_id,
                     "general": general,
+                    "folder_name": folder_name,
                 },
             },
             link=upsert_data.s(
@@ -331,6 +335,7 @@ def reprocess_data(
     record_id = record.record_id
     checklist_id = record.checklist_id
     general = record.general
+    folder_name = current_user.company_name.lower().replace(" ", "_")
     existing_record = db.get_record_by_id(record_id, owner_id=str(current_user.id))
     if not existing_record:
         return JSONResponse(status_code=404, content={"error": "Record not found"})
@@ -349,6 +354,7 @@ def reprocess_data(
                 "audio_record": record,
                 "checklist_id": checklist_id,
                 "general": general,
+                "folder_name": folder_name,
             },
         },
         link=upsert_data.s(

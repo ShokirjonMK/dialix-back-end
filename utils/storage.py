@@ -1,6 +1,9 @@
 import datetime
+import logging
 import os
 import re
+
+from fastapi import HTTPException
 from filelock import FileLock
 from google.cloud import storage
 from utils.redis_utils import cache
@@ -13,6 +16,13 @@ def get_client():
     if storage_client is None:
         storage_client = storage.Client()
     return storage_client
+
+
+def folder_exists(bucket_name: str, folder_name: str) -> bool:
+    client = get_client()
+    bucket = client.bucket(bucket_name)
+    blobs = list(bucket.list_blobs(prefix=folder_name))
+    return any(blob.name == f"{folder_name}/" for blob in blobs)
 
 
 def download_file(bucket, remote_path, local_path):
