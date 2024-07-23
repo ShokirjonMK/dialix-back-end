@@ -164,7 +164,7 @@ def api_processing(self: PredictTask, **kwargs):
     checklist_response = {}
 
     if general:
-        gender = self.classify_speaker_gender(file_path, record["title"])
+        # gender = self.classify_speaker_gender(file_path, record["title"])
         general_response = general_checker(conversation, general_prompt, courses_list)
         db.create_transaction(
             owner_id=record["owner_id"],
@@ -179,7 +179,7 @@ def api_processing(self: PredictTask, **kwargs):
                 "operator_answer_delay": operator_answer_delay,
                 "operator_speech_duration": operator_speech_duration,
                 "customer_speech_duration": customer_speech_duration,
-                "customer_gender": gender.get("gender"),
+                "customer_gender": "male",
             }
         )
 
