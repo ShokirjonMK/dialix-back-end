@@ -41,7 +41,7 @@ class Record(BaseModel):
     title: str
     duration: float
     payload: dict = {}
-    operator_code: str = None
+    operator_code: int = None
     operator_name: str = None
     call_type: str = None
     source: str = None
@@ -56,3 +56,10 @@ class ReprocessRecord(BaseModel):
     record_id: str
     checklist_id: str = None
     general: bool = False
+
+
+class OperatorData(BaseModel):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    code: int
+    name: str
+    deleted_at: datetime = None

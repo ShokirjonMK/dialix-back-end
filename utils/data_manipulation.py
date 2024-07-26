@@ -155,3 +155,39 @@ def find_position_from_filename(file_path):
             return 1, 0
     except Exception as e:
         return 0, 1
+
+
+def find_operator_code(title):
+    # Extract numbers (assuming they are separated by underscores)
+    parts = title.split("_")
+
+    # Extract the phone number and operator number based on their position
+    number_1 = parts[-1].split(".")[0]  # Removing the file extension if any
+    number_2 = parts[-2]
+
+    # Determine operator codes based on the order
+    if len(number_1) == 3:
+        operator_code = number_1
+    elif len(number_2) == 3:
+        operator_code = number_2
+    else:
+        operator_code = None  # Default in case the format is unexpected
+
+    return operator_code
+
+
+def find_call_type(title):
+    # Extract numbers (assuming they are separated by underscores)
+    parts = title.split("_")
+
+    # Extract the phone number and operator number based on their position
+    number_1 = parts[-1].split(".")[0]  # Removing the file extension if any
+    number_2 = parts[-2]
+
+    # Determine if the call is inbound or outbound
+    if len(number_1) == 3:
+        return "inbound"
+    elif len(number_2) == 3:
+        return "outbound"
+    else:
+        return "unknown"  # Default in case the format is unexpected

@@ -520,3 +520,37 @@ def create_topup_transaction(
             ),
         )
         return dict(cursor.fetchone())
+
+
+@db_connection_wrapper
+def upsert_operator(connection, operator: dict):
+    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+        keys = [
+            key for key in operator.keys() if key not in ["created_at", "updated_at"]
+        ]
+        id = operator["id"]
+
+        cursor.execute(
+            f"INSERT INTO operator_data ({', '.join(keys)}) VALUES ({', '.join(['%s'] * len(keys))}) ON CONFLICT (id) DO UPDATE SET {', '.join([f'{key} = %s' for key in keys])}, updated_at = NOW() WHERE operator_data.id = %s RETURNING *",
+            tuple([operator[key] for key in keys]) * 2 + (id,),
+        )
+
+        return dict(cursor.fetchone())
+
+
+@db_connection_wrapper
+def get_operators(connection, owner_id: str):
+    return select_many(
+        connection,
+        "SELECT * FROM operator_data WHERE owner_id = %s",
+        (owner_id,),
+    )
+
+
+@db_connection_wrapper
+def get_operator_name_by_code(connection, owner_id: str, code: int):
+    return select_one(
+        connection,
+        "SELECT name FROM operator_data WHERE owner_id = %s AND code = %s",
+        (owner_id, code),
+    )

@@ -8,12 +8,13 @@ from typing import Annotated, List, Tuple, Union
 from fastapi import Depends, Body, UploadFile, Request, HTTPException
 from fastapi.responses import JSONResponse
 from backend.app import app
+from utils.data_manipulation import find_operator_code, find_call_type
 from utils.storage import get_stream_url, upload_file
 from utils.audio import generate_waveform, get_audio_duration
 from utils.encoder import DateTimeEncoder, adapt_json
 from workers.api import api_processing
 from backend.auth import get_current_user
-from backend.schemas import User, CheckList, ReprocessRecord
+from backend.schemas import User, CheckList, ReprocessRecord, OperatorData
 from celery.result import AsyncResult
 from workers.data import upsert_data
 
@@ -240,11 +241,19 @@ def analyze_data(
         upload_file(bucket, f"{folder_name}/{storage_id}", file_path)
         logging.warning(f"folder_name: {folder_name} storage_id: {storage_id}, bucket: {bucket}")
         task_id = get_task_id(user_id=current_user.id)
+        operator_code = find_operator_code(file.filename)
+        call_type = find_call_type(file.filename)
+        operator_name = db.get_operator_name_by_code(
+            owner_id=owner_id, code=operator_code
+        ).get("name", None)
 
         record = {
             "id": record_id,
             "owner_id": owner_id,
             "title": file.filename,
+            "operator_code": operator_code,
+            "operator_name": operator_name,
+            "call_type": call_type,
             "status": status,
             "duration": duration * 1000,
             "storage_id": storage_id,
@@ -339,6 +348,21 @@ def reprocess_data(
     existing_record = db.get_record_by_id(record_id, owner_id=str(current_user.id))
     if not existing_record:
         return JSONResponse(status_code=404, content={"error": "Record not found"})
+
+    # # count the price
+    # balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0)
+    # balance = balance if balance is not None else 0
+    # total_price = 0
+    # duration = existing_record["duration"]
+    # mohirai_price = (
+    #     duration * db.MOHIRAI_PRICE_PER_MS if
+    # )
+    # general_price = duration * db.GENERAL_PROMPT_PRICE_PER_MS if general is True else 0
+    # checklist_price = (
+    #     duration * db.CHECKLIST_PROMPT_PRICE_PER_MS if checklist_id is not None else 0
+    # )
+    # total_price += mohirai_price + general_price + checklist_price
+    #
 
     record = {
         **existing_record,
@@ -507,10 +531,28 @@ def get_checklist_by_id(
     return JSONResponse(status_code=404, content={"error": "Not found"})
 
 
-# TODO: add logic to remove all results related to the check list
-@app.delete("/checklist/{checklist_id}")
-def delete_checklist(checklist_id: str, current_user: User = Depends(get_current_user)):
-    result = db.delete_checklist(checklist_id, owner_id=str(current_user.id))
-    if result:
-        return JSONResponse(status_code=200, content={"success": True})
-    return JSONResponse(status_code=404, content={"error": "Not found"})
+@app.post("/operator")
+def upsert_operator(
+    data: OperatorData,
+    current_user: User = Depends(get_current_user),
+):
+    operator_code = data.code
+    operator_name = data.name
+    deleted_at = data.deleted_at
+    operator = {
+        "id": str(data.id),
+        "owner_id": str(current_user.id),
+        "code": int(operator_code),
+        "name": operator_name,
+        "deleted_at": deleted_at,
+    }
+    result = db.upsert_operator(operator=operator)
+    response = adapt_json(result)
+    return JSONResponse(status_code=200, content=response)
+
+
+@app.get("/operators")
+def get_list_of_operators(current_user: User = Depends(get_current_user)):
+    data = db.get_operators(owner_id=str(current_user.id))
+    data = adapt_json(data)
+    return JSONResponse(status_code=200, content=data)
