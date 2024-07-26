@@ -349,20 +349,22 @@ def reprocess_data(
     if not existing_record:
         return JSONResponse(status_code=404, content={"error": "Record not found"})
 
-    # # count the price
-    # balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0)
-    # balance = balance if balance is not None else 0
-    # total_price = 0
-    # duration = existing_record["duration"]
-    # mohirai_price = (
-    #     duration * db.MOHIRAI_PRICE_PER_MS if
-    # )
-    # general_price = duration * db.GENERAL_PROMPT_PRICE_PER_MS if general is True else 0
-    # checklist_price = (
-    #     duration * db.CHECKLIST_PROMPT_PRICE_PER_MS if checklist_id is not None else 0
-    # )
-    # total_price += mohirai_price + general_price + checklist_price
-    #
+    # count the price
+    balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0)
+    balance = balance if balance is not None else 0
+    total_price = 0
+    duration = existing_record["duration"]
+    mohirai_price = (
+        duration * db.MOHIRAI_PRICE_PER_MS if existing_record["payload"] is None else 0
+    )
+    general_price = duration * db.GENERAL_PROMPT_PRICE_PER_MS if general is True else 0
+    checklist_price = (
+        duration * db.CHECKLIST_PROMPT_PRICE_PER_MS if checklist_id is not None else 0
+    )
+    total_price += mohirai_price + general_price + checklist_price
+
+    if total_price > balance:
+        return JSONResponse(status_code=400, content={"error": "Not enough balance"})
 
     record = {
         **existing_record,
