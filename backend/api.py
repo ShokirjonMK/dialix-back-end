@@ -502,13 +502,14 @@ def get_pending_audios(current_user: User = Depends(get_current_user)):
 
 @app.post("/checklist")
 def upsert_checklist(
-    data: CheckList,
-    current_user: User = Depends(get_current_user),
+        data: CheckList,
+        current_user: User = Depends(get_current_user),
 ):
-    deleted_at = data.deleted_at
     logging.warning(f"Checklist data: {data}")
-    if 'deleted_at' in data and isinstance(data['deleted_at'], str):
-        deleted_at = datetime.fromisoformat(data['deleted_at'].rstrip("Z"))
+
+    if isinstance(data.deleted_at, str):
+        logging.warning(f"Deleted at: {data.deleted_at}")
+        deleted_at = datetime.fromisoformat(data.deleted_at.rstrip("Z"))
     else:
         deleted_at = None
 
@@ -525,9 +526,9 @@ def upsert_checklist(
         "owner_id": str(current_user.id),
     }
     result = db.upsert_checklist(checklist=checklist)
+    logging.warning(f"Checklist result: {result}")
     response = adapt_json(result)
     return JSONResponse(status_code=200, content=response)
-
 
 @app.post("/activate_checklist")
 def activate_checklist(
