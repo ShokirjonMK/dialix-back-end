@@ -158,21 +158,17 @@ def find_position_from_filename(file_path):
 
 
 def find_operator_code(title):
-    # Extract numbers (assuming they are separated by underscores)
     parts = title.split("_")
 
-    # Extract the phone number and operator number based on their position
-    number_1 = parts[-1].split(".")[0]  # Removing the file extension if any
+    number_1 = parts[-1].split(".")[0]
     number_2 = parts[-2]
 
-    # Determine operator codes based on the order
     if len(number_1) == 3:
         operator_code = number_1
     elif len(number_2) == 3:
         operator_code = number_2
     else:
-        operator_code = None  # Default in case the format is unexpected
-
+        operator_code = None
     return operator_code
 
 

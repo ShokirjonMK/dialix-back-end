@@ -243,9 +243,8 @@ def analyze_data(
         task_id = get_task_id(user_id=current_user.id)
         operator_code = find_operator_code(file.filename)
         call_type = find_call_type(file.filename)
-        operator_name = db.get_operator_name_by_code(
-            owner_id=owner_id, code=operator_code
-        ).get("name", None)
+        operator = db.get_operator_name_by_code(owner_id=owner_id, code=operator_code) or {}
+        operator_name = operator.get("name", None)
 
         record = {
             "id": record_id,
@@ -487,10 +486,16 @@ def upsert_checklist(
     data: CheckList,
     current_user: User = Depends(get_current_user),
 ):
+    deleted_at = data.deleted_at
+    logging.warning(f"Checklist data: {data}")
+    if 'deleted_at' in data and isinstance(data['deleted_at'], str):
+        deleted_at = datetime.fromisoformat(data['deleted_at'].rstrip("Z"))
+    else:
+        deleted_at = None
+
     id = str(data.id)
     title = data.title
     payload = json.dumps(data.payload)
-    deleted_at = data.deleted_at
     active = data.active
     checklist = {
         "id": id,

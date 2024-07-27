@@ -32,7 +32,7 @@ class CheckList(BaseModel):
     title: str
     payload: list = []
     active: bool = False
-    deleted_at: datetime = None
+    deleted_at: str = ""
 
 
 class Record(BaseModel):
