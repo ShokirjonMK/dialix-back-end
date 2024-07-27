@@ -548,6 +548,20 @@ def get_operators(connection, owner_id: str):
 
 
 @db_connection_wrapper
+def get_number_of_operators_records_count(connection, owner_id: str, operator_code: int):
+    query = "SELECT COUNT(*) FROM record WHERE owner_id = %s AND operator_code = %s"
+    params = (owner_id, operator_code)
+    return select_one(connection, query, params)
+
+
+@db_connection_wrapper
+def get_number_records(connection, owner_id: str):
+    query = "SELECT COUNT(*) FROM record WHERE owner_id = %s"
+    params = (owner_id,)
+    return select_one(connection, query, params)
+
+
+@db_connection_wrapper
 def get_operator_name_by_code(connection, owner_id: str, code: int):
     return select_one(
         connection,

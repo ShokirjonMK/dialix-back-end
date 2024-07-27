@@ -1,5 +1,6 @@
 import json
 import logging
+import math
 import os
 import uuid
 import shutil
@@ -29,6 +30,22 @@ def get_task_id(user_id):
 
 def get_object_storage_id(extension):
     return f"{uuid.uuid4()}.{extension}"
+
+
+def get_operators_data(owner_id):
+    operators = db.get_operators(owner_id=str(owner_id))
+    number_of_records = db.get_number_records(owner_id=str(owner_id)).get("count", 0)
+    result = []
+
+    for operator in operators:
+        operator_results =db.get_number_of_operators_records_count(owner_id=str(owner_id), operator_code=str(operator["code"])).get("count", 0)
+        result.append({
+            "operator_code": operator["code"],
+            "operator_name": operator["name"],
+            "number_of_records": operator_results,
+            "number_of_records_percentage": math.floor((operator_results / number_of_records) * 100),
+        })
+    return result
 
 
 def calculate_daily_satisfaction(data):
@@ -449,6 +466,7 @@ def results(current_user: User = Depends(get_current_user)):
     number_of_conversations = db.get_count_of_records(
         owner_id=str(current_user.id)
     ).get("count")
+    operator_data = get_operators_data(owner_id=str(current_user.id))
 
     male_count = sum(1 for item in data if item["customer_gender"] == "male")
     female_count = sum(1 for item in data if item["customer_gender"] == "female")
@@ -469,6 +487,7 @@ def results(current_user: User = Depends(get_current_user)):
             "number_of_conversations": number_of_conversations,
             "male_count": male_count,
             "female_count": female_count,
+            "operator_data": operator_data,
             **satisfaction_rate_by_month,
         },
     )
