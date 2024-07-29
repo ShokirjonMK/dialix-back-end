@@ -459,7 +459,7 @@ def reprocess_data(
 def results(current_user: User = Depends(get_current_user)):
     data = db.get_results(owner_id=str(current_user.id))
 
-    if data is None:
+    if len(data) == 0:
         return JSONResponse(status_code=200, content={})
 
     data = adapt_json(data)
