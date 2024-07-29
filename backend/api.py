@@ -475,22 +475,30 @@ def results(current_user: User = Depends(get_current_user)):
         calculate_daily_satisfaction(data)
     )
 
-    return JSONResponse(
+    content = {
+        "full_conversations": full_conversations,
+        "total_duration": total_duration,
+        "average_delay": average_delay,
+        "average_duration": average_duration,
+        "satisfaction_rate": satisfaction_rate,
+        "unsatisfaction_rate": unsatisfaction_rate,
+        "number_of_conversations": number_of_conversations,
+        "male_count": male_count,
+        "female_count": female_count,
+        "operator_data": operator_data,
+        **satisfaction_rate_by_month,
+    }
+
+    logging.warning(f"Response content: {content}")
+
+    response = JSONResponse(
         status_code=200,
-        content={
-            "full_conversations": full_conversations,
-            "total_duration": total_duration,
-            "average_delay": average_delay,
-            "average_duration": average_duration,
-            "satisfaction_rate": satisfaction_rate,
-            "unsatisfaction_rate": unsatisfaction_rate,
-            "number_of_conversations": number_of_conversations,
-            "male_count": male_count,
-            "female_count": female_count,
-            "operator_data": operator_data,
-            **satisfaction_rate_by_month,
-        },
+        content=content,
     )
+
+    logging.warning(f"Dashboard data response: {response}")
+
+    return response
 
 
 @app.get("/audios/pending")
