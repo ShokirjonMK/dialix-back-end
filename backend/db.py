@@ -460,8 +460,6 @@ def get_results(connection, owner_id: str):
         LEFT JOIN record rec ON r.record_id = rec.id
         LEFT JOIN checklist cl ON r.checklist_id = cl.id
         WHERE r.owner_id = %s
-        AND rec.deleted_at IS NULL
-        AND cl.deleted_at IS NULL
         """,
         (owner_id,),
     )
@@ -548,7 +546,9 @@ def get_operators(connection, owner_id: str):
 
 
 @db_connection_wrapper
-def get_number_of_operators_records_count(connection, owner_id: str, operator_code: int):
+def get_number_of_operators_records_count(
+    connection, owner_id: str, operator_code: int
+):
     query = "SELECT COUNT(*) FROM record WHERE owner_id = %s AND operator_code = %s"
     params = (owner_id, operator_code)
     return select_one(connection, query, params)
