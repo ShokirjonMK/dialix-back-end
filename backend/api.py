@@ -537,7 +537,7 @@ def upsert_checklist(
 ):
     logging.warning(f"Checklist data: {data}")
 
-    if isinstance(data.deleted_at, str):
+    if data.deleted_at and isinstance(data.deleted_at, str):
         logging.warning(f"Deleted at: {data.deleted_at}")
         deleted_at = datetime.fromisoformat(data.deleted_at.rstrip("Z"))
     else:
