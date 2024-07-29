@@ -38,13 +38,19 @@ def get_operators_data(owner_id):
     result = []
 
     for operator in operators:
-        operator_results =db.get_number_of_operators_records_count(owner_id=str(owner_id), operator_code=str(operator["code"])).get("count", 0)
-        result.append({
-            "operator_code": operator["code"],
-            "operator_name": operator["name"],
-            "number_of_records": operator_results,
-            "number_of_records_percentage": math.floor((operator_results / number_of_records) * 100),
-        })
+        operator_results = db.get_number_of_operators_records_count(
+            owner_id=str(owner_id), operator_code=str(operator["code"])
+        ).get("count", 0)
+        result.append(
+            {
+                "operator_code": operator["code"],
+                "operator_name": operator["name"],
+                "number_of_records": operator_results,
+                "number_of_records_percentage": math.floor(
+                    (operator_results / number_of_records) * 100
+                ),
+            }
+        )
     return result
 
 
@@ -52,17 +58,25 @@ def calculate_daily_satisfaction(data):
     # Get the current date and the start dates for the last and current months
     current_date = datetime.now().date()
     last_month_start = (current_date.replace(day=1) - timedelta(days=1)).replace(day=1)
-    end_of_last_month = (current_date.replace(day=1) - timedelta(days=1))
+    end_of_last_month = current_date.replace(day=1) - timedelta(days=1)
     current_month_start = current_date.replace(day=1)
-    end_of_current_month = (current_month_start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    end_of_current_month = (
+        current_month_start.replace(day=28) + timedelta(days=4)
+    ).replace(day=1) - timedelta(days=1)
 
     # Initialize dictionaries to hold satisfaction counts for each day
     last_month_satisfaction = {}
     current_month_satisfaction = {}
 
     # Generate string formatted dates for keys
-    last_month_days = [(last_month_start + timedelta(days=i)).strftime("%Y-%m-%d") for i in range((end_of_last_month - last_month_start).days + 1)]
-    current_month_days = [(current_month_start + timedelta(days=i)).strftime("%Y-%m-%d") for i in range((end_of_current_month - current_month_start).days + 1)]
+    last_month_days = [
+        (last_month_start + timedelta(days=i)).strftime("%Y-%m-%d")
+        for i in range((end_of_last_month - last_month_start).days + 1)
+    ]
+    current_month_days = [
+        (current_month_start + timedelta(days=i)).strftime("%Y-%m-%d")
+        for i in range((end_of_current_month - current_month_start).days + 1)
+    ]
 
     for day in last_month_days:
         last_month_satisfaction[day] = 0
@@ -71,19 +85,25 @@ def calculate_daily_satisfaction(data):
 
     # Distribute satisfaction counts into the respective dictionaries
     for entry in data:
-        date_of_result = datetime.strptime(entry["result_created_at"], "%Y-%m-%dT%H:%M:%S.%f").date()
+        date_of_result = datetime.strptime(
+            entry["result_created_at"], "%Y-%m-%dT%H:%M:%S.%f"
+        ).date()
         date_str = date_of_result.strftime("%Y-%m-%d")
         if entry["is_customer_satisfied"]:
             if last_month_start <= date_of_result <= end_of_last_month:
                 if date_str in last_month_satisfaction:
                     last_month_satisfaction[date_str] += 1
                 else:
-                    logging.warning(f"Date {date_str} is out of expected range for last month.")
+                    logging.warning(
+                        f"Date {date_str} is out of expected range for last month."
+                    )
             elif current_month_start <= date_of_result <= end_of_current_month:
                 if date_str in current_month_satisfaction:
                     current_month_satisfaction[date_str] += 1
                 else:
-                    logging.warning(f"Date {date_str} is out of expected range for current month.")
+                    logging.warning(
+                        f"Date {date_str} is out of expected range for current month."
+                    )
 
     # Return the daily satisfaction rates
     return {
@@ -256,11 +276,15 @@ def analyze_data(
         folder_name = current_user.company_name.lower().replace(" ", "_")
 
         upload_file(bucket, f"{folder_name}/{storage_id}", file_path)
-        logging.warning(f"folder_name: {folder_name} storage_id: {storage_id}, bucket: {bucket}")
+        logging.warning(
+            f"folder_name: {folder_name} storage_id: {storage_id}, bucket: {bucket}"
+        )
         task_id = get_task_id(user_id=current_user.id)
         operator_code = find_operator_code(file.filename)
         call_type = find_call_type(file.filename)
-        operator = db.get_operator_name_by_code(owner_id=owner_id, code=operator_code) or {}
+        operator = (
+            db.get_operator_name_by_code(owner_id=owner_id, code=operator_code) or {}
+        )
         operator_name = operator.get("name", None)
 
         record = {
@@ -435,7 +459,7 @@ def reprocess_data(
 def results(current_user: User = Depends(get_current_user)):
     data = db.get_results(owner_id=str(current_user.id))
 
-    if not data:
+    if data is None:
         return JSONResponse(status_code=200, content={})
 
     data = adapt_json(data)
@@ -471,9 +495,7 @@ def results(current_user: User = Depends(get_current_user)):
     male_count = sum(1 for item in data if item["customer_gender"] == "male")
     female_count = sum(1 for item in data if item["customer_gender"] == "female")
 
-    satisfaction_rate_by_month = (
-        calculate_daily_satisfaction(data)
-    )
+    satisfaction_rate_by_month = calculate_daily_satisfaction(data)
 
     content = {
         "full_conversations": full_conversations,
@@ -510,8 +532,8 @@ def get_pending_audios(current_user: User = Depends(get_current_user)):
 
 @app.post("/checklist")
 def upsert_checklist(
-        data: CheckList,
-        current_user: User = Depends(get_current_user),
+    data: CheckList,
+    current_user: User = Depends(get_current_user),
 ):
     logging.warning(f"Checklist data: {data}")
 
@@ -537,6 +559,7 @@ def upsert_checklist(
     logging.warning(f"Checklist result: {result}")
     response = adapt_json(result)
     return JSONResponse(status_code=200, content=response)
+
 
 @app.post("/activate_checklist")
 def activate_checklist(
