@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y ffmpeg libpq-dev \
 
 COPY requirements.txt /app/
 RUN pip install -r requirements.txt
+RUN pip install torch torchvision torchaudio
 
 COPY . . 
 #COPY backend /app/backend

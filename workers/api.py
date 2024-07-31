@@ -165,7 +165,9 @@ def api_processing(self: PredictTask, **kwargs):
     checklist_response = {}
 
     if general:
-        # gender = self.classify_speaker_gender(file_path, record["title"])
+        gender = self.classify_speaker_gender(file_path, record["title"])
+        gender = gender["result"]["gender"]
+        logging.info(f"Gender detected: {gender}")
         general_response = general_checker(conversation, general_prompt, courses_list)
         db.create_transaction(
             owner_id=record["owner_id"],
