@@ -182,7 +182,7 @@ def api_processing(self: PredictTask, **kwargs):
                 "operator_answer_delay": operator_answer_delay,
                 "operator_speech_duration": operator_speech_duration,
                 "customer_speech_duration": customer_speech_duration,
-                "customer_gender": "male",
+                "customer_gender": gender,
             }
         )
 
