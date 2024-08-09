@@ -10,7 +10,8 @@ from ratelimit import limits, sleep_and_retry
 def mohirAI(file_path):
     logging.warning(f"Processing file in mohirAI function: {file_path}")
     url = "https://mohirai.uz/api/v1/stt"
-    headers = {"Authorization": os.getenv("MOHIRAI_API_KEY")}
+    headers = {"Authorization": os.getenv("MOHIRAI_API_KEY","")}
+
 
     files = {
         "file": ("audio.mp3", open(file_path, "rb")),
@@ -35,7 +36,7 @@ def mohirAI(file_path):
         poll_interval = 10  # Check every 10 seconds
         while True:
             response = requests.get(
-                f"https://mohir.ai/api/v1/tasks?id={task_id}",
+                f"https://mohirai.uz/api/v1/tasks?id={task_id}",
                 headers=headers,
             )
             result = response.json()
