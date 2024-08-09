@@ -9,7 +9,7 @@ from ratelimit import limits, sleep_and_retry
 @limits(calls=5, period=60)
 def mohirAI(file_path):
     logging.warning(f"Processing file in mohirAI function: {file_path}")
-    url = "https://mohir.ai/api/v1/stt"
+    url = "https://mohirai.uz/api/v1/stt"
     headers = {"Authorization": os.getenv("MOHIRAI_API_KEY")}
 
     files = {
