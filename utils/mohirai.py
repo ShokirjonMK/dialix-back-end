@@ -10,8 +10,8 @@ from ratelimit import limits, sleep_and_retry
 def mohirAI(file_path):
     logging.warning(f"Processing file in mohirAI function: {file_path}")
     url = "https://uzbekvoice.ai/api/v1/stt"
-    headers = {"Authorization": os.getenv("MOHIRAI_API_KEY","")}
-
+    headers = {"Authorization": "58e09394-1a7a-4318-86cd-fd8b35596d3f:196a8fe5-99b8-48d9-bb02-52e5f2543c6f"}
+#os.getenv("MOHIRAI_API_KEY","")
 
     files = {
         "file": ("audio.mp3", open(file_path, "rb")),
