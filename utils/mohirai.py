@@ -10,7 +10,7 @@ from ratelimit import limits, sleep_and_retry
 def mohirAI(file_path):
     logging.warning(f"Processing file in mohirAI function: {file_path}")
     url = "https://uzbekvoice.ai/api/v1/stt"
-    headers = {"Authorization": "58e09394-1a7a-4318-86cd-fd8b35596d3f:196a8fe5-99b8-48d9-bb02-52e5f2543c6f"}
+    headers = {"Authorization": "58e09394-1a7a-4318-86cd-fd8b35596d3f:196a8fe5-99b8-48d9-bb02-52e5f2543c6f", 'Content-Type': 'application/json'}
 #os.getenv("MOHIRAI_API_KEY","")
 
     files = {
@@ -44,9 +44,11 @@ def mohirAI(file_path):
         poll_interval = 10  # Check every 10 seconds
         while True:
             response = requests.get(
-                f"https://uzbekvoice.ai/api/v1/tasks?id={task_id}",
+                f'https://uzbekvoice.ai/api/v1/tasks?id={task_id}',
                 headers=headers,
             )
+            print("Task polling result")
+            print(response)
             result = response.json()
             print("Print data for ID from result")
             print(result)
