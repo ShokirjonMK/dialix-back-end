@@ -19,6 +19,7 @@ def mohirAI(file_path):
     data = {
         "return_offsets": "true",
         "run_diarization": "true",
+        "language": "uz",
         "blocking": "false",
     }
 
