@@ -35,6 +35,12 @@ def mohirAI(file_path):
 
         response_data = general_response.json()
         task_id = response_data.get("id", None)
+
+        print("response data")
+        print(response_data)
+        task_id_temp= response_data['id']
+        print("Temp resp data")
+        print(task_id_temp)
         poll_interval = 10  # Check every 10 seconds
         while True:
             response = requests.get(
