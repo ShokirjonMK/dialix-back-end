@@ -9,9 +9,11 @@ from ratelimit import limits, sleep_and_retry
 @limits(calls=5, period=60)
 def mohirAI(file_path):
     logging.warning(f"Processing file in mohirAI function: {file_path}")
-    url = "https://uzbekvoice.ai/api/v1/stt"
-    headers = {"Authorization": "58e09394-1a7a-4318-86cd-fd8b35596d3f:196a8fe5-99b8-48d9-bb02-52e5f2543c6f"}
-#os.getenv("MOHIRAI_API_KEY","")
+    api_key = "da7c8191-3842-4d4f-bba8-6867aaaac663:7948f6e2-b1ca-4df1-8a2a-9c5f7828172c"
+    url = 'https://uzbekvoice.ai/api/v1/stt'
+    headers = {
+        "Authorization": api_key
+    }
 
     files = {
         "file": ("audio.mp3", open(file_path, "rb")),
@@ -42,12 +44,16 @@ def mohirAI(file_path):
         print("Temp resp data")
         print(task_id_temp)
         poll_interval = 10  # Check every 10 seconds
-        headers = {"Authorization": "58e09394-1a7a-4318-86cd-fd8b35596d3f:196a8fe5-99b8-48d9-bb02-52e5f2543c6f", 'Content-Type': 'application/json'}
         url = f'https://uzbekvoice.ai/api/v1/tasks?id={task_id}'
-        time.sleep(poll_interval)
+        headers = {
+            'Authorization': api_key,
+            'Content-Type': 'application/json'
+        }
         while True:
-            
-            response = requests.get(url,headers=headers)
+            print("Started sleeping")
+            time.sleep(7)
+            print("Sleep end")
+            response = requests.get(url, headers=headers)
             print("Task polling result")
             print(response)
             result = response.json()
