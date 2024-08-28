@@ -43,7 +43,7 @@ def mohirAI(file_path):
         task_id_temp= response_data['id']
         print("Temp resp data")
         print(task_id_temp)
-        poll_interval = 25  # Check every 10 seconds
+        poll_interval = 45  # Check every 10 seconds
         url = f'https://uzbekvoice.ai/api/v1/tasks?id={task_id}'
         headers = {
             'Authorization': api_key,
@@ -51,7 +51,7 @@ def mohirAI(file_path):
         }
         while True:
             print("Started sleeping")
-            time.sleep(25)
+            time.sleep(45)
             print("Sleep end")
             response = requests.get(url, headers=headers)
             print("Task polling result")
