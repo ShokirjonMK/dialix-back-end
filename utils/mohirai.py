@@ -42,15 +42,10 @@ def mohirAI(file_path):
         print("Temp resp data")
         print(task_id_temp)
         poll_interval = 10  # Check every 10 seconds
-        headers = {
-        'Authorization':"58e09394-1a7a-4318-86cd-fd8b35596d3f:196a8fe5-99b8-48d9-bb02-52e5f2543c6f" ,
-        'Content-Type': 'application/json'
-        }
+        headers = {"Authorization": "58e09394-1a7a-4318-86cd-fd8b35596d3f:196a8fe5-99b8-48d9-bb02-52e5f2543c6f", 'Content-Type': 'application/json'}
+        url = f'https://uzbekvoice.ai/api/v1/tasks?id={task_id}'
         while True:
-            response = requests.get(
-                f'https://uzbekvoice.ai/api/v1/tasks?id={task_id}',
-                headers=headers,
-            )
+            response = requests.get(url,headers=headers)
             print("Task polling result")
             print(response)
             result = response.json()
