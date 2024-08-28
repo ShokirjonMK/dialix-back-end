@@ -7,7 +7,7 @@ from pydub import AudioSegment
 
 # Function to calculate sleep time based on audio length
 def calculate_sleep_time(duration_minutes):
-    if 0<=duration_minutes<=4
+    if 0<=duration_minutes<=4:
         return 5
     elif 5 <= duration_minutes < 10:
         return 10
