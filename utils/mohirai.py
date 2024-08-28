@@ -51,7 +51,7 @@ def mohirAI(file_path):
         }
         while True:
             print("Started sleeping")
-            time.sleep(15)
+            time.sleep(25)
             print("Sleep end")
             response = requests.get(url, headers=headers)
             print("Task polling result")
