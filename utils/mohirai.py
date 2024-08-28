@@ -3,7 +3,20 @@ import os
 import time
 import requests
 from ratelimit import limits, sleep_and_retry
+from pydub import AudioSegment
 
+# Function to calculate sleep time based on audio length
+def calculate_sleep_time(duration_minutes):
+    if 5 <= duration_minutes < 10:
+        return 10
+    elif 10 <= duration_minutes < 15:
+        return 20
+    elif 15 <= duration_minutes < 20:
+        return 30
+    elif duration_minutes >= 20:
+        return 45
+    else:
+        return 0  # No sleep for audio less than 5 minutes
 
 @sleep_and_retry
 @limits(calls=5, period=60)
@@ -25,6 +38,15 @@ def mohirAI(file_path):
         "blocking": "false",
     }
 
+    # Calculate the audio duration and set the poll interval
+    audio = AudioSegment.from_file(file_path)
+    duration_ms = len(audio)
+    duration_minutes = duration_ms / 60000
+    poll_interval = calculate_sleep_time(duration_minutes)
+
+    print(f"Audio length: {duration_minutes:.2f} minutes")
+    print(f"Poll interval (sleep time): {poll_interval} seconds")
+
     try:
         general_response = requests.post(url, headers=headers, files=files, data=data)
         print("General Response is now printing")
@@ -40,18 +62,19 @@ def mohirAI(file_path):
 
         print("response data")
         print(response_data)
-        task_id_temp= response_data['id']
+        task_id_temp = response_data['id']
         print("Temp resp data")
         print(task_id_temp)
-        poll_interval = 45  # Check every 10 seconds
+
         url = f'https://uzbekvoice.ai/api/v1/tasks?id={task_id}'
         headers = {
             'Authorization': api_key,
             'Content-Type': 'application/json'
         }
+
         while True:
             print("Started sleeping")
-            time.sleep(45)
+            time.sleep(poll_interval)
             print("Sleep end")
             response = requests.get(url, headers=headers)
             print("Task polling result")
@@ -62,12 +85,7 @@ def mohirAI(file_path):
             if response.status_code == 200:
                 if result["status"] == "SUCCESS":
                     return result
-                time.sleep(poll_interval)
-            elif (
-                response.status_code == 404
-                or response.status_code == 408
-                or response.status_code == 500
-            ):
+            elif response.status_code in [404, 408, 500]:
                 logging.error(
                     f"Task {task_id} failed with code:{response.status_code} and body:{result}"
                 )
