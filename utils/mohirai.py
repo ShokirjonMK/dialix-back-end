@@ -7,7 +7,9 @@ from pydub import AudioSegment
 
 # Function to calculate sleep time based on audio length
 def calculate_sleep_time(duration_minutes):
-    if 5 <= duration_minutes < 10:
+    if 0<=duration_minutes<=4
+        return 5
+    elif 5 <= duration_minutes < 10:
         return 10
     elif 10 <= duration_minutes < 15:
         return 20
@@ -16,7 +18,7 @@ def calculate_sleep_time(duration_minutes):
     elif duration_minutes >= 20:
         return 45
     else:
-        return 0  # No sleep for audio less than 5 minutes
+        return 8  # No sleep for audio less than 5 minutes
 
 @sleep_and_retry
 @limits(calls=5, period=60)
