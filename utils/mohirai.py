@@ -34,7 +34,7 @@ def mohirAI(file_path):
             general_response.raise_for_status()
 
         response_data = general_response.json()
-        task_id = response_data.get("id", None)
+        task_id = response_data["id"]
 
         print("response data")
         print(response_data)
