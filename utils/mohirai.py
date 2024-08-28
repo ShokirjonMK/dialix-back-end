@@ -25,7 +25,8 @@ def mohirAI(file_path):
 
     try:
         general_response = requests.post(url, headers=headers, files=files, data=data)
-
+        print("General Response is now printing")
+        print(general_response)
         if general_response.status_code != 200:
             logging.error(
                 f"Request failed with status code {general_response.status_code}: {general_response.text}"
@@ -41,6 +42,8 @@ def mohirAI(file_path):
                 headers=headers,
             )
             result = response.json()
+            print("Print data for ID from result")
+            print(result)
             if response.status_code == 200:
                 if result["status"] == "SUCCESS":
                     return result
