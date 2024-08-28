@@ -43,7 +43,7 @@ def mohirAI(file_path):
         task_id_temp= response_data['id']
         print("Temp resp data")
         print(task_id_temp)
-        poll_interval = 15  # Check every 10 seconds
+        poll_interval = 25  # Check every 10 seconds
         url = f'https://uzbekvoice.ai/api/v1/tasks?id={task_id}'
         headers = {
             'Authorization': api_key,
