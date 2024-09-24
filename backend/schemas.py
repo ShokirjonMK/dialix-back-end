@@ -4,7 +4,7 @@ import uuid
 
 
 class UserCreate(BaseModel):
-    id: uuid.UUID = uuid.uuid4()
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
     email: EmailStr
     username: constr(min_length=3, max_length=255)
     password: str
