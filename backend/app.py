@@ -99,7 +99,7 @@ def signup(user: UserCreate, credentials: HTTPBasicCredentials = Depends(securit
         new_user = db.create_user(user.dict())
         access_token = create_access_token(data={"user_id": str(new_user["id"])})
         response = JSONResponse({"success": True})
-        response.set_cookie(key="access_token", value=access_token, httponly=True)
+        response.set_cookie(key="access_token", value=access_token, httponly=True, samesite="none", secure=True)
         return response
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to sign up: {str(e)}")
@@ -115,7 +115,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     response = JSONResponse(
         status_code=200, content={"user": user_json, "token_type": "bearer"}
     )
-    response.set_cookie(key="access_token", value=access_token, httponly=True)
+    response.set_cookie(key="access_token", value=access_token, httponly=True, samesite="none", secure=True)
     return response
 
 
