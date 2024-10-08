@@ -4,3 +4,6 @@
 /uploads/
 /.env
 /models/
+/_only_speech.mp3
+/need.txt
+/venv/
