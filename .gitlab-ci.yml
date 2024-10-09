@@ -17,10 +17,14 @@ build_image:
     - ssh-keyscan -t rsa gitlab.com >> ~/.ssh/known_hosts
     - chmod 700 ~/.ssh
   script: |
+      [[ $CI_COMMIT_REF_NAME = 'main' ]] && SERVICE_POSTFIX="" || SERVICE_POSTFIX="-dev"
       [[ $CI_COMMIT_REF_NAME = 'main' ]] && IMAGE_TAG="$CI_PIPELINE_IID" || IMAGE_TAG="$CI_PIPELINE_IID-dev"
+
       echo Docker image tag is $IMAGE_TAG
-      make build-image TAG=$IMAGE_TAG SERVICE_NAME=$CI_PROJECT_NAME PROJECT_NAME=$CI_PROJECT_NAMESPACE REGISTRY=$CI_REGISTRY ENV_TAG=latest
-      make push-image TAG=$IMAGE_TAG SERVICE_NAME=$CI_PROJECT_NAME PROJECT_NAME=$CI_PROJECT_NAMESPACE REGISTRY=$CI_REGISTRY ENV_TAG=latest
+      echo Postfix is $SERVICE_POSTFIX
+
+      make build-image TAG=$IMAGE_TAG SERVICE_NAME=$CI_PROJECT_NAME PROJECT_NAME=$CI_PROJECT_NAMESPACE REGISTRY=$CI_REGISTRY ENV_TAG=latest$SERVICE_POSTFIX
+      make push-image TAG=$IMAGE_TAG SERVICE_NAME=$CI_PROJECT_NAME PROJECT_NAME=$CI_PROJECT_NAMESPACE REGISTRY=$CI_REGISTRY ENV_TAG=latest$SERVICE_POSTFIX
   only:
     - main
     - dev
@@ -37,12 +41,12 @@ deploy_image_prod:
     - echo "$GITLAB_PRIVATE_KEY" > ~/.ssh/id_rsa
     - echo "$CI_REGISTRY"
   script: |
-      [[ $CI_COMMIT_REF_NAME = 'main' ]] && IMAGE_TAG="$CI_PIPELINE_IID" || IMAGE_TAG="$CI_PIPELINE_IID-dev"
       [[ $CI_COMMIT_REF_NAME = 'main' ]] && SERVICE_POSTFIX="" || SERVICE_POSTFIX="-dev"
-      ssh -o StrictHostKeyChecking=no -tt root@34.141.76.50 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$IMAGE_TAG\\\" \\\\' /etc/systemd/system/docker-web.service && systemctl daemon-reload && systemctl restart docker-web$SERVICE_POSTFIX"
-      # ssh -o StrictHostKeyChecking=no -tt root@34.159.44.81 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_PIPELINE_IID\ "  ' /etc/systemd/system/docker-web.service && systemctl daemon-reload && systemctl restart docker-web"
-      ssh -o StrictHostKeyChecking=no -tt root@34.141.76.50 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$IMAGE_TAG\\\" \\\\'   /etc/systemd/system/docker-api-worker.service && systemctl daemon-reload && systemctl restart docker-api-worker$SERVICE_POSTFIX"
-      ssh -o StrictHostKeyChecking=no -tt root@34.141.76.50 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$IMAGE_TAG\\\" \\\\' /etc/systemd/system/docker-data-worker.service && systemctl daemon-reload && systemctl restart docker-data-worker$SERVICE_POSTFIX"
+      [[ $CI_COMMIT_REF_NAME = 'main' ]] && IMAGE_TAG="$CI_PIPELINE_IID" || IMAGE_TAG="$CI_PIPELINE_IID-dev"
+
+      ssh -o StrictHostKeyChecking=no -tt root@34.141.76.50 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$IMAGE_TAG\\\" \\\\' /etc/systemd/system/docker-web$SERVICE_POSTFIX.service && systemctl daemon-reload && systemctl restart docker-web$SERVICE_POSTFIX"
+      ssh -o StrictHostKeyChecking=no -tt root@34.141.76.50 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$IMAGE_TAG\\\" \\\\'   /etc/systemd/system/docker-api-worker$SERVICE_POSTFIX.service && systemctl daemon-reload && systemctl restart docker-api-worker$SERVICE_POSTFIX"
+      ssh -o StrictHostKeyChecking=no -tt root@34.141.76.50 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$IMAGE_TAG\\\" \\\\' /etc/systemd/system/docker-data-worker$SERVICE_POSTFIX.service && systemctl daemon-reload && systemctl restart docker-data-worker$SERVICE_POSTFIX"
   only:
     - main
     - dev
