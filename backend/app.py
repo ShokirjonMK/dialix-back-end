@@ -1,8 +1,9 @@
+import os
 import asyncio
 import logging
-import os
+from typing import Annotated
 from datetime import datetime
-from typing import Annotated, Type
+from platform import node as get_hostname
 
 from fastapi import FastAPI, Depends, HTTPException, status, Body
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -99,7 +100,13 @@ def signup(user: UserCreate, credentials: HTTPBasicCredentials = Depends(securit
         new_user = db.create_user(user.dict())
         access_token = create_access_token(data={"user_id": str(new_user["id"])})
         response = JSONResponse({"success": True})
-        response.set_cookie(key="access_token", value=access_token, httponly=True, samesite="none", secure=True)
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            samesite="none",
+            secure=True,
+        )
         return response
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to sign up: {str(e)}")
@@ -115,7 +122,13 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     response = JSONResponse(
         status_code=200, content={"user": user_json, "token_type": "bearer"}
     )
-    response.set_cookie(key="access_token", value=access_token, httponly=True, samesite="none", secure=True)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        samesite="none",
+        secure=True,
+    )
     return response
 
 
@@ -160,13 +173,13 @@ def topup(
 
 
 @app.get("/healthz")
-@auth_wrapper
-def healthz(credentials: HTTPBasicCredentials = Depends(security)):
-    db.migrate_up()
+def healthz():
+    # db.migrate_up()
     return JSONResponse(
         status_code=200,
         content={
             "status": "ok",
             "time": datetime.now().isoformat(),
+            "hostname": get_hostname(),
         },
     )
