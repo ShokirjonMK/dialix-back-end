@@ -165,7 +165,6 @@ async def process_form_data(request: Request):
         raise HTTPException(status_code=400, detail="Mismatched lengths of arrays.")
     return files, general, checklist_id, processed_files
 
-
 @app.get("/audios_results")
 def get_audio_and_results(current_user: User = Depends(get_current_user)):
     recordings = db.get_records(owner_id=str(current_user.id))
