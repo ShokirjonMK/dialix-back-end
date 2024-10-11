@@ -33,7 +33,11 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 
-origins = ["http://localhost:3000", "https://dialix.org"]
+origins: list[str] = [
+    "http://localhost:3000",
+    "https://dialix.org",
+    "https://dev.dialix.org",
+]
 
 app.add_middleware(
     CORSMiddleware,
