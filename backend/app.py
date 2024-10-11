@@ -23,11 +23,12 @@ from fastapi.middleware.cors import CORSMiddleware
 import secrets
 from backend.sockets import sio_app
 from functools import wraps
+from backend.core.lifespan import lifespan_handler
 
-app = FastAPI()
+
+app = FastAPI(lifespan=lifespan_handler)
 app.mount("/ws/", app=sio_app)
 
-# Set environment variables before importing TensorFlow or initializing tasks
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"

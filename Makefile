@@ -18,4 +18,6 @@ clear-image:
 push-image:
 	docker push ${REGISTRY}/${PROJECT_NAME}/${APP}:${TAG}
 	docker push ${REGISTRY}/${PROJECT_NAME}/${APP}:${ENV_TAG}
-
+run-local:
+	# .env file should exist. It loads(exports) everything from this file then runs backend
+	@export $(cat .env | xargs) && python3 backend/server.py
