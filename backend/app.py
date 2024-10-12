@@ -1,33 +1,35 @@
 import os
 import asyncio
+import secrets
 import logging
+import datetime
+from functools import wraps
 from typing import Annotated
-from datetime import datetime
 from platform import node as get_hostname
 
-from fastapi import FastAPI, Depends, HTTPException, status, Body
+from starlette import status
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from starlette.responses import JSONResponse
+from fastapi import FastAPI, Depends, HTTPException, status, Body
+
+import backend.db as db
+from backend.database import user_service
 
 from backend.auth import (
     create_access_token,
-    hash_password,
     get_current_user,
     authenticate_user,
 )
-from fastapi.security import OAuth2PasswordRequestForm
-
-import backend.db as db
-from backend.schemas import UserCreate, User
-from fastapi.middleware.cors import CORSMiddleware
-import secrets
 from backend.sockets import sio_app
-from functools import wraps
+from backend.core.lifespan import lifespan_handler
+from backend.schemas import UserCreate, User
 
-app = FastAPI()
+
+app = FastAPI(lifespan=lifespan_handler)
 app.mount("/ws/", app=sio_app)
 
-# Set environment variables before importing TensorFlow or initializing tasks
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
@@ -97,23 +99,25 @@ def auth_wrapper(endpoint):
 
 
 @app.post("/signup")
-@auth_wrapper
-def signup(user: UserCreate, credentials: HTTPBasicCredentials = Depends(security)):
-    user.password = hash_password(user.password)
-    try:
-        new_user = db.create_user(user.dict())
-        access_token = create_access_token(data={"user_id": str(new_user["id"])})
-        response = JSONResponse({"success": True})
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=True,
-            samesite="none",
-            secure=True,
-        )
-        return response
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to sign up: {str(e)}")
+# @auth_wrapper
+async def signup(
+    user: UserCreate,
+    credentials: HTTPBasicCredentials = Depends(security),
+):
+    registered_user = await user_service.create_user(user.model_dump())
+
+    access_token = create_access_token(data={"user_id": str(registered_user["id"])})
+
+    response = JSONResponse({"success": True}, status_code=status.HTTP_201_CREATED)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        samesite="none",
+        secure=True,
+    )
+
+    return response
 
 
 @app.post("/login")
@@ -139,13 +143,25 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 @app.post("/logout")
 def logout():
     response = JSONResponse({"success": True})
-    response.delete_cookie("access_token")
+
+    expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+        seconds=1
+    )
+
+    response.set_cookie(
+        key="access_token",
+        httponly=True,
+        samesite="none",
+        secure=True,
+        value="",
+        expires=expires.strftime("%a, %d %b %Y %H:%M:%S GMT"),
+    )
     return response
 
 
 @app.get("/me")
 def read_users_me(current_user: User = Depends(get_current_user)):
-    logging.warning("current_user: %s", current_user)
+    logging.info(f"Current_user is {current_user}")
     return {"user": current_user}
 
 

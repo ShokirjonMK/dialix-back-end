@@ -1,18 +1,18 @@
-import logging
 import os
+import bcrypt
+import logging
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
+
 from passlib.context import CryptContext
+
 from fastapi import HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
-import bcrypt
 from psycopg2.extras import RealDictCursor
 
 from . import db
 from .schemas import User
-from .db import ConnectionWrapper
 
-# Configuration
 SECRET_KEY = os.getenv("AUTH_SECRET_KEY")
 ALGORITHM = os.getenv("AUTH_ALGORITHM")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
