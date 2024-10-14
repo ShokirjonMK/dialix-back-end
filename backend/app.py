@@ -12,28 +12,31 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fastapi import FastAPI, Depends, HTTPException, status, Body
+from fastapi import FastAPI, Depends, HTTPException, Body
 
-import backend.db as db
+from backend import db
 from backend.database import user_service
-
-from backend.auth import (
-    create_access_token,
+from backend.core.auth import (
+    generate_access_token,
     get_current_user,
     authenticate_user,
 )
 from backend.sockets import sio_app
-from backend.core.lifespan import lifespan_handler
 from backend.schemas import UserCreate, User
-
+from backend.core.lifespan import lifespan_handler
+from backend.core.logging import configure_logging
+from backend.core.exceptions import register_exception_handlers
 
 app = FastAPI(lifespan=lifespan_handler)
+
+configure_logging()
+register_exception_handlers(app)
+
 app.mount("/ws/", app=sio_app)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-
 
 origins: list[str] = [
     "http://localhost:3000",
@@ -80,6 +83,7 @@ def auth_wrapper(endpoint):
     @wraps(endpoint)
     async def secured_endpoint(*args, **kwargs):
         credentials: HTTPBasicCredentials = kwargs.get("credentials", None)
+
         if not credentials or not authenticate_basic_auth(credentials):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -99,16 +103,17 @@ def auth_wrapper(endpoint):
 
 
 @app.post("/signup")
-# @auth_wrapper
+@auth_wrapper
 async def signup(
     user: UserCreate,
     credentials: HTTPBasicCredentials = Depends(security),
 ):
     registered_user = await user_service.create_user(user.model_dump())
 
-    access_token = create_access_token(data={"user_id": str(registered_user["id"])})
+    access_token = generate_access_token(data={"user_id": str(registered_user["id"])})
 
     response = JSONResponse({"success": True}, status_code=status.HTTP_201_CREATED)
+
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -121,15 +126,25 @@ async def signup(
 
 
 @app.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = await authenticate_user(form_data.username, form_data.password)
+
     if not user:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-    access_token = create_access_token(data={"user_id": str(user.id)})
-    user_json = user.json()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect username or password",
+        )
+    logging.info(f"{str(user.id)=}")
+    access_token = generate_access_token(data={"user_id": str(user.id)})
+
     response = JSONResponse(
-        status_code=200, content={"user": user_json, "token_type": "bearer"}
+        status_code=status.HTTP_200_OK,
+        content={
+            "user": user.model_dump(mode="json", exclude="password"),
+            "token_type": "bearer",
+        },
     )
+
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -137,6 +152,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         samesite="none",
         secure=True,
     )
+
     return response
 
 
@@ -161,7 +177,6 @@ def logout():
 
 @app.get("/me")
 def read_users_me(current_user: User = Depends(get_current_user)):
-    logging.info(f"Current_user is {current_user}")
     return {"user": current_user}
 
 
@@ -192,14 +207,13 @@ def topup(
         return JSONResponse(status_code=400, content={"error": str(e)})
 
 
-@app.get("/healthz")
-def healthz():
-    # db.migrate_up()
+@app.get("/health")
+def health():
     return JSONResponse(
         status_code=200,
         content={
             "status": "ok",
-            "time": datetime.now().isoformat(),
+            "time": datetime.datetime.now().isoformat(),
             "hostname": get_hostname(),
         },
     )

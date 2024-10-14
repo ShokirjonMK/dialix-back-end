@@ -14,7 +14,7 @@ from utils.storage import get_stream_url, upload_file
 from utils.audio import generate_waveform, get_audio_duration
 from utils.encoder import DateTimeEncoder, adapt_json
 from workers.api import api_processing
-from backend.auth import get_current_user
+from backend.core.auth import get_current_user
 from backend.schemas import User, CheckList, ReprocessRecord, OperatorData
 from celery.result import AsyncResult
 from workers.data import upsert_data
