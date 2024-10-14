@@ -144,8 +144,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 def logout():
     response = JSONResponse({"success": True})
 
-    expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
-        seconds=1
+    expires = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+        seconds=10
     )
 
     response.set_cookie(
