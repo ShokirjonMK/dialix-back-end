@@ -15,7 +15,6 @@ async def init_tortoise(fastapi_app: FastAPI) -> AsyncGenerator[None, None]:
         app=fastapi_app,
         db_url=DATABASE_URL,
         modules={"models": ["backend.database.models"]},
-        add_exception_handlers=True,
         generate_schemas=True,
     ):
         logging.info("Tortoise ORM registered!")

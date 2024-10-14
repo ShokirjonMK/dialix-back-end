@@ -1,6 +1,6 @@
 from backend.database.models import Account
 
-from backend.auth import hash_password
+from backend.core.auth import hash_password
 
 
 async def create_user(user_data: dict) -> dict | None:
