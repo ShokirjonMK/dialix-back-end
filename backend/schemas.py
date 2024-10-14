@@ -24,7 +24,7 @@ class User(BaseModel):
     updated_at: datetime
 
     def hide_password(self):
-        return self.copy(exclude={"password": ...})
+        return self.model_copy(exclude={"password": ...})
 
 
 class CheckList(BaseModel):
