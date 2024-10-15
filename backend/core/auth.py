@@ -14,7 +14,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from backend import db
 from backend.schemas import User
-from backend.database.models import Account
+from backend.database.models import Account, BlackListToken
 from backend.database.model_schemas import AccountPydantic
 
 SECRET_KEY = os.getenv("AUTH_SECRET_KEY")
@@ -26,9 +26,18 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 async def get_current_user(request: Request):
     token = request.cookies.get("access_token")
+
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
+
+    if await BlackListToken.filter(value=token).exists():
+        logging.info(f"Received blacklisted token: {token[:15]}...")
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated*",  # * means blacklisted ;)
         )
 
     try:
@@ -43,7 +52,6 @@ async def get_current_user(request: Request):
         )
 
     account = await Account.filter(id=user_id).first()
-    logging.info(f"Fetched account: {account}")
 
     if not account:
         raise HTTPException(

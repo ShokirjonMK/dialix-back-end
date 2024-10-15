@@ -5,6 +5,7 @@ from typing import Annotated
 from platform import node as get_hostname
 
 from fastapi import status
+from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -23,7 +24,7 @@ from backend.schemas import UserCreate, User
 from backend.core.lifespan import lifespan_handler
 from backend.core.logging import configure_logging
 from backend.core.exceptions import register_exception_handlers  # noqa: F401
-
+from backend.auth.utils import add_to_blacklist
 from backend.auth.basic import basic_auth_security, basic_auth_wrapper
 
 app = FastAPI(lifespan=lifespan_handler)
@@ -103,21 +104,17 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> JSONRespons
 
 
 @app.post("/logout")
-def logout() -> JSONResponse:
-    expires = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
-        seconds=10
-    )
+async def logout(
+    request: Request, current_user: User = Depends(get_current_user)
+) -> JSONResponse:
+    access_token: str | None = request.cookies.get("access_token")
+    
+    if access_token is not None:
+        await add_to_blacklist(access_token)
 
     response = JSONResponse({"success": True})
+    response.delete_cookie(key="access_token")
 
-    response.delete_cookie(
-        key="access_token",
-        httponly=True,
-        samesite="none",
-        secure=True,
-        value="",
-        expires=expires.strftime("%a, %d %b %Y %H:%M:%S GMT"),
-    )
     return response
 
 
