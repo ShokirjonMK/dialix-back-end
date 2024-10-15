@@ -108,12 +108,17 @@ async def logout(
     request: Request, current_user: User = Depends(get_current_user)
 ) -> JSONResponse:
     access_token: str | None = request.cookies.get("access_token")
-    
+
     if access_token is not None:
         await add_to_blacklist(access_token)
 
     response = JSONResponse({"success": True})
-    response.delete_cookie(key="access_token")
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        samesite="none",
+        secure=True,
+    )
 
     return response
 
