@@ -28,7 +28,7 @@ async def integrity_error_handler(request: Request, exc: IntegrityError):
 
 def register_exception_handlers(app: FastAPI) -> None:
     exceptions_table = {
-        DoesNotExist: does_not_exist_handler,
+        # DoesNotExist: does_not_exist_handler,
         IntegrityError: integrity_error_handler,
     }
 

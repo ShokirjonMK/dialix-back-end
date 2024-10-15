@@ -11,19 +11,17 @@ from starlette import status
 from fastapi import HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 
-from tortoise.contrib.pydantic import pydantic_model_creator, pydantic_queryset_creator
 
 from backend import db
 from backend.schemas import User
 from backend.database.models import Account
+from backend.database.model_schemas import AccountPydantic
 
 SECRET_KEY = os.getenv("AUTH_SECRET_KEY")
 ALGORITHM = os.getenv("AUTH_ALGORITHM")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-AccountPydantic = pydantic_model_creator(Account)
 
 
 async def get_current_user(request: Request):
@@ -44,10 +42,10 @@ async def get_current_user(request: Request):
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is invalid"
         )
 
-    account = await Account.get(id=user_id)
+    account = await Account.filter(id=user_id).first()
     logging.info(f"Fetched account: {account}")
 
-    if await account.first() is None:
+    if not account:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User does not exist, you probably gave hard coded user_id",
@@ -74,13 +72,17 @@ def get_current_user_websocket(token: str):
 
 
 async def authenticate_user(username: str, password: str):
-    account = await Account.get(username=username)
+    account = await Account.filter(username=username).first()
 
-    if account and bcrypt.checkpw(
+    password_matches: bool = bcrypt.checkpw(
         password=password.encode("utf-8"),
         hashed_password=account.password.encode("utf-8"),
-    ):
+    )
+
+    if account and password_matches:
         return await AccountPydantic.from_tortoise_orm(account)
+
+    return
 
 
 def hash_password(password: str) -> str:
