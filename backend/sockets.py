@@ -1,10 +1,13 @@
+import os
 import logging
 import socketio
 from fastapi import HTTPException
-from backend import auth
+from backend.core import auth
 from http.cookies import SimpleCookie
 
-redis_manager = socketio.AsyncRedisManager("redis://redis:6379/0")
+REDIS_URL: str = os.getenv("REDIS_URL")
+
+redis_manager = socketio.AsyncRedisManager(REDIS_URL)
 
 sio_server = socketio.AsyncServer(
     async_mode="asgi",

@@ -1,39 +1,42 @@
 import os
-import asyncio
-import secrets
 import logging
 import datetime
-from functools import wraps
 from typing import Annotated
 from platform import node as get_hostname
 
-from starlette import status
+from fastapi import status
+from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fastapi import FastAPI, Depends, HTTPException, status, Body
+from fastapi.security import HTTPBasicCredentials
+from fastapi import FastAPI, Depends, HTTPException, Body
 
-import backend.db as db
+from backend import db
 from backend.database import user_service
-
-from backend.auth import (
-    create_access_token,
+from backend.core.auth import (
+    generate_access_token,
     get_current_user,
     authenticate_user,
 )
 from backend.sockets import sio_app
-from backend.core.lifespan import lifespan_handler
 from backend.schemas import UserCreate, User
-
+from backend.core.lifespan import lifespan_handler
+from backend.core.logging import configure_logging
+from backend.core.exceptions import register_exception_handlers  # noqa: F401
+from backend.auth.utils import add_to_blacklist
+from backend.auth.basic import basic_auth_security, basic_auth_wrapper
 
 app = FastAPI(lifespan=lifespan_handler)
+
+configure_logging()
+register_exception_handlers(app)
+
 app.mount("/ws/", app=sio_app)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-
 
 origins: list[str] = [
     "http://localhost:3000",
@@ -49,64 +52,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-security = HTTPBasic()
-
-
-def authenticate_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
-    # Encode the credentials to compare
-    input_user_name = credentials.username.encode("utf-8")
-    input_password = credentials.password.encode("utf-8")
-
-    # Retrieve stored credentials securely from environment variables
-    stored_username = os.getenv("BASIC_AUTH_USERNAME").encode("utf-8")
-    stored_password = os.getenv("BASIC_AUTH_PASSWORD").encode("utf-8")
-
-    # Compare credentials securely
-    is_username = secrets.compare_digest(input_user_name, stored_username)
-    is_password = secrets.compare_digest(input_password, stored_password)
-
-    if is_username and is_password:
-        return True
-
-    # If credentials are invalid, raise an HTTP Exception
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid credentials",
-        headers={"WWW-Authenticate": "Basic"},
-    )
-
-
-def auth_wrapper(endpoint):
-    @wraps(endpoint)
-    async def secured_endpoint(*args, **kwargs):
-        credentials: HTTPBasicCredentials = kwargs.get("credentials", None)
-        if not credentials or not authenticate_basic_auth(credentials):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials",
-                headers={"WWW-Authenticate": "Basic"},
-            )
-        # Check if the endpoint is a coroutine (asynchronous function)
-        if callable(endpoint):
-            if asyncio.iscoroutinefunction(endpoint):
-                return await endpoint(*args, **kwargs)
-            else:
-                return endpoint(*args, **kwargs)
-        else:
-            raise TypeError("Endpoint must be a callable function")
-
-    return secured_endpoint
-
 
 @app.post("/signup")
-# @auth_wrapper
+@basic_auth_wrapper
 async def signup(
     user: UserCreate,
-    credentials: HTTPBasicCredentials = Depends(security),
-):
-    registered_user = await user_service.create_user(user.model_dump())
+    credentials: HTTPBasicCredentials = Depends(basic_auth_security),
+) -> JSONResponse:
+    registered_user = await user_service.create_user(user.model_dump(mode="json"))
 
-    access_token = create_access_token(data={"user_id": str(registered_user["id"])})
+    access_token = generate_access_token(data={"user_id": str(registered_user["id"])})
 
     response = JSONResponse({"success": True}, status_code=status.HTTP_201_CREATED)
     response.set_cookie(
@@ -121,15 +76,22 @@ async def signup(
 
 
 @app.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
+async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> JSONResponse:
+    user = await authenticate_user(form_data.username, form_data.password)
+
     if not user:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-    access_token = create_access_token(data={"user_id": str(user.id)})
-    user_json = user.json()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect username or password",
+        )
+
+    access_token = generate_access_token(data={"user_id": str(user.id)})
+
     response = JSONResponse(
-        status_code=200, content={"user": user_json, "token_type": "bearer"}
+        status_code=status.HTTP_200_OK,
+        content={"user": user.model_dump(mode="json"), "token_type": "bearer"},
     )
+
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -137,47 +99,43 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         samesite="none",
         secure=True,
     )
+
     return response
 
 
 @app.post("/logout")
-def logout():
+async def logout(
+    request: Request, current_user: User = Depends(get_current_user)
+) -> JSONResponse:
+    access_token: str | None = request.cookies.get("access_token")
+    
+    if access_token is not None:
+        await add_to_blacklist(access_token)
+
     response = JSONResponse({"success": True})
+    response.delete_cookie(key="access_token")
 
-    expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
-        seconds=1
-    )
-
-    response.set_cookie(
-        key="access_token",
-        httponly=True,
-        samesite="none",
-        secure=True,
-        value="",
-        expires=expires.strftime("%a, %d %b %Y %H:%M:%S GMT"),
-    )
     return response
 
 
 @app.get("/me")
-def read_users_me(current_user: User = Depends(get_current_user)):
-    logging.info(f"Current_user is {current_user}")
+def retrieve_current_user(current_user: User = Depends(get_current_user)):
     return {"user": current_user}
 
 
 @app.get("/balance")
-def get_balance(current_user: User = Depends(get_current_user)):
+def retrieve_current_user_balance(current_user: User = Depends(get_current_user)):
     balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0)
     logging.warning("balance: %s", balance)
     return {"balance": balance}
 
 
 @app.post("/topup")
-@auth_wrapper
+@basic_auth_wrapper
 def topup(
     amount: Annotated[int, Body(...)],
     email: Annotated[str, Body(...)],
-    credentials: HTTPBasicCredentials = Depends(security),
+    credentials: HTTPBasicCredentials = Depends(basic_auth_security),
 ):
     try:
         user = db.get_user_by_email(email)
@@ -192,14 +150,13 @@ def topup(
         return JSONResponse(status_code=400, content={"error": str(e)})
 
 
-@app.get("/healthz")
-def healthz():
-    # db.migrate_up()
+@app.get("/health")
+def health():
     return JSONResponse(
-        status_code=200,
+        status_code=status.HTTP_200_OK,
         content={
             "status": "ok",
-            "time": datetime.now().isoformat(),
             "hostname": get_hostname(),
+            "time": datetime.datetime.now().isoformat(),
         },
     )
