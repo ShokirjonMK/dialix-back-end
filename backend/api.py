@@ -166,7 +166,7 @@ async def process_form_data(request: Request):
     return files, general, checklist_id, processed_files
 
 @app.get("/audios_results")
-def get_audio_and_results(current_user: User = Depends(get_current_user)):
+async def get_audio_and_results(current_user: User = Depends(get_current_user)):
     recordings = db.get_records(owner_id=str(current_user.id))
     recordings = adapt_json(recordings)
     just_audios = []
@@ -216,7 +216,7 @@ async def get_audio_file(request: Request, storage_id: str):
 
 
 @app.get("/audios_results")
-def get_audio_and_results(current_user: User = Depends(get_current_user)):
+async def get_audio_and_results(current_user: User = Depends(get_current_user)):
     recordings = db.get_records(owner_id=str(current_user.id))
     recordings = adapt_json(recordings)
     logging.warning(json.dumps(f"Recordings: {recordings}", indent=2))
@@ -253,7 +253,7 @@ def get_audio_and_results(current_user: User = Depends(get_current_user)):
 
 
 @app.post("/audio", dependencies=[Depends(get_current_user)])
-def analyze_data(
+async def analyze_data(
     processed_data: Tuple[
         List[UploadFile], List[bool], List[Union[str, None]], List[dict]
     ] = Depends(process_form_data),
@@ -376,7 +376,7 @@ def analyze_data(
 
 
 @app.post("/reprocess")
-def reprocess_data(
+async def reprocess_data(
     record: ReprocessRecord,
     current_user: User = Depends(get_current_user),
 ):
@@ -455,7 +455,7 @@ def reprocess_data(
 
 
 @app.get("/dashboard")
-def results(current_user: User = Depends(get_current_user)):
+async def results(current_user: User = Depends(get_current_user)):
     data = db.get_results(owner_id=str(current_user.id))
 
     if len(data) == 0:
@@ -523,14 +523,14 @@ def results(current_user: User = Depends(get_current_user)):
 
 
 @app.get("/audios/pending")
-def get_pending_audios(current_user: User = Depends(get_current_user)):
+async def get_pending_audios(current_user: User = Depends(get_current_user)):
     data = db.get_pending_audios(owner_id=str(current_user.id))
     data = adapt_json(data)
     return JSONResponse(status_code=200, content=data)
 
 
 @app.post("/checklist")
-def upsert_checklist(
+async def upsert_checklist(
     data: CheckList,
     current_user: User = Depends(get_current_user),
 ):
@@ -561,7 +561,7 @@ def upsert_checklist(
 
 
 @app.post("/activate_checklist")
-def activate_checklist(
+async def activate_checklist(
     checklist_id: str, current_user: User = Depends(get_current_user)
 ):
     result = db.activate_checklist(checklist_id, owner_id=str(current_user.id))
@@ -571,14 +571,14 @@ def activate_checklist(
 
 
 @app.get("/checklists")
-def get_list_of_checklists(current_user: User = Depends(get_current_user)):
+async def get_list_of_checklists(current_user: User = Depends(get_current_user)):
     data = db.get_checklists(owner_id=str(current_user.id))
     data = adapt_json(data)
     return JSONResponse(status_code=200, content=data)
 
 
 @app.get("/checklist/{checklist_id}")
-def get_checklist_by_id(
+async def get_checklist_by_id(
     checklist_id: str, current_user: User = Depends(get_current_user)
 ):
     data = db.get_checklist_by_id(checklist_id, owner_id=str(current_user.id))
@@ -589,7 +589,7 @@ def get_checklist_by_id(
 
 
 @app.post("/operator")
-def upsert_operator(
+async def upsert_operator(
     data: OperatorData,
     current_user: User = Depends(get_current_user),
 ):
@@ -609,7 +609,7 @@ def upsert_operator(
 
 
 @app.get("/operators")
-def get_list_of_operators(current_user: User = Depends(get_current_user)):
+async def get_list_of_operators(current_user: User = Depends(get_current_user)):
     data = db.get_operators(owner_id=str(current_user.id))
     data = adapt_json(data)
     return JSONResponse(status_code=200, content=data)
