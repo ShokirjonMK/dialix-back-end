@@ -11,9 +11,6 @@ from starlette import status
 from fastapi import HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 
-
-from backend import db
-from backend.schemas import User
 from backend.database.models import Account, BlackListToken
 from backend.database.model_schemas import AccountPydantic
 
@@ -62,21 +59,26 @@ async def get_current_user(request: Request):
     return await AccountPydantic.from_tortoise_orm(account)
 
 
-def get_current_user_websocket(token: str):
+async def get_current_user_websocket(token: str):
     if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated") from None
+        return None
+
+    if await BlackListToken.filter(value=token).exists():
+        logging.info(f"Received blacklisted token: {token[:15]}...")
+        return None
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("user_id")
-        if user_id is None:
-            raise HTTPException(status_code=401, detail="Invalid token") from None
-        user = db.get_user_by_id(user_id)
-        user = User.parse_obj(dict(user))
-        if user is None:
-            raise HTTPException(status_code=404, detail="User not found") from None
     except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token") from None
-    return user.hide_password()
+        return None
+
+    account = await Account.filter(id=user_id).first()
+
+    if not account:
+        return None
+
+    return await AccountPydantic.from_tortoise_orm(account)
 
 
 async def authenticate_user(username: str, password: str):
