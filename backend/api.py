@@ -5,20 +5,19 @@ import os
 import uuid
 import shutil
 import backend.db as db
-from typing import Annotated, List, Tuple, Union
-from fastapi import Depends, Body, UploadFile, Request, HTTPException, APIRouter
+from typing import List, Tuple, Union
+from fastapi import Depends, UploadFile, Request, HTTPException, APIRouter
 from fastapi.responses import JSONResponse
 from utils.data_manipulation import find_operator_code, find_call_type
 from utils.storage import get_stream_url, upload_file
-from utils.audio import generate_waveform, get_audio_duration
-from utils.encoder import DateTimeEncoder, adapt_json
+from utils.audio import get_audio_duration
+from utils.encoder import adapt_json
 from workers.api import api_processing
 from backend.core.auth import get_current_user
-from backend.schemas import User, CheckList, ReprocessRecord, OperatorData
+from backend.schemas import User, ReprocessRecord, OperatorData
 from celery.result import AsyncResult
 from workers.data import upsert_data
 
-import datetime
 from datetime import datetime, timedelta
 
 
@@ -134,7 +133,7 @@ async def process_form_data(request: Request):
         duration = get_audio_duration(file_path)
 
         if duration is None:
-            logging.error(f"Error occurred while getting audio duration")
+            logging.error("Error occurred while getting audio duration")
             if os.path.exists(file_path):
                 os.remove(file_path)
             return JSONResponse(
@@ -530,65 +529,6 @@ async def get_pending_audios(current_user: User = Depends(get_current_user)):
     data = db.get_pending_audios(owner_id=str(current_user.id))
     data = adapt_json(data)
     return JSONResponse(status_code=200, content=data)
-
-
-@api_router.post("/checklist")
-async def upsert_checklist(
-    data: CheckList,
-    current_user: User = Depends(get_current_user),
-):
-    logging.warning(f"Checklist data: {data}")
-
-    if data.deleted_at and isinstance(data.deleted_at, str):
-        logging.warning(f"Deleted at: {data.deleted_at}")
-        deleted_at = datetime.fromisoformat(data.deleted_at.rstrip("Z"))
-    else:
-        deleted_at = None
-
-    id = str(data.id)
-    title = data.title
-    payload = json.dumps(data.payload)
-    active = data.active
-    checklist = {
-        "id": id,
-        "title": title,
-        "payload": payload,
-        "active": active,
-        "deleted_at": deleted_at,
-        "owner_id": str(current_user.id),
-    }
-    result = db.upsert_checklist(checklist=checklist)
-    logging.warning(f"Checklist result: {result}")
-    response = adapt_json(result)
-    return JSONResponse(status_code=200, content=response)
-
-
-@api_router.post("/activate_checklist")
-async def activate_checklist(
-    checklist_id: str, current_user: User = Depends(get_current_user)
-):
-    result = db.activate_checklist(checklist_id, owner_id=str(current_user.id))
-    if result:
-        return JSONResponse(status_code=200, content={"success": True})
-    return JSONResponse(status_code=404, content={"error": "Not found"})
-
-
-@api_router.get("/checklists")
-async def get_list_of_checklists(current_user: User = Depends(get_current_user)):
-    data = db.get_checklists(owner_id=str(current_user.id))
-    data = adapt_json(data)
-    return JSONResponse(status_code=200, content=data)
-
-
-@api_router.get("/checklist/{checklist_id}")
-async def get_checklist_by_id(
-    checklist_id: str, current_user: User = Depends(get_current_user)
-):
-    data = db.get_checklist_by_id(checklist_id, owner_id=str(current_user.id))
-    if data:
-        data = adapt_json(data)
-        return JSONResponse(status_code=200, content=data)
-    return JSONResponse(status_code=404, content={"error": "Not found"})
 
 
 @api_router.post("/operator")
