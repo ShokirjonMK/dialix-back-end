@@ -40,6 +40,7 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 origins: list[str] = [
     "http://localhost:3000",
+    "https://localhost:3000",
     "https://dialix.org",
     "https://dev.dialix.org",
 ]
