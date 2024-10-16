@@ -15,6 +15,7 @@ from backend.core.logging import configure_logging
 from backend.core.exceptions import register_exception_handlers  # noqa: F401
 
 from backend.routers.user import user_router
+from backend.routers.checklist import checklist_router
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -24,8 +25,10 @@ configure_logging()
 register_exception_handlers(application)
 
 application.mount("/ws/", app=sio_app)
-application.include_router(user_router)
+
 application.include_router(api_router)
+application.include_router(user_router)
+application.include_router(checklist_router)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
