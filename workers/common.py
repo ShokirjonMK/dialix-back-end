@@ -117,7 +117,7 @@ class PredictTask(Task):
             client_channel = 1
         else:
             client_channel = 0
-        try: 
+        try:
             channel_1 = y[client_channel]
             sf.write(new_file_path, data=channel_1, samplerate=sr)
 

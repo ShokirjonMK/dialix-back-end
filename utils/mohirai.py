@@ -5,9 +5,10 @@ import requests
 from ratelimit import limits, sleep_and_retry
 from pydub import AudioSegment
 
+
 # Function to calculate sleep time based on audio length
 def calculate_sleep_time(duration_minutes):
-    if 0<=duration_minutes<=4:
+    if 0 <= duration_minutes <= 4:
         return 5
     elif 5 <= duration_minutes < 10:
         return 10
@@ -20,15 +21,16 @@ def calculate_sleep_time(duration_minutes):
     else:
         return 8  # No sleep for audio less than 5 minutes
 
+
 @sleep_and_retry
 @limits(calls=5, period=60)
 def mohirAI(file_path):
     logging.warning(f"Processing file in mohirAI function: {file_path}")
-    api_key = "da7c8191-3842-4d4f-bba8-6867aaaac663:7948f6e2-b1ca-4df1-8a2a-9c5f7828172c"
-    url = 'https://uzbekvoice.ai/api/v1/stt'
-    headers = {
-        "Authorization": api_key
-    }
+    api_key = (
+        "da7c8191-3842-4d4f-bba8-6867aaaac663:7948f6e2-b1ca-4df1-8a2a-9c5f7828172c"
+    )
+    url = "https://uzbekvoice.ai/api/v1/stt"
+    headers = {"Authorization": api_key}
 
     files = {
         "file": ("audio.mp3", open(file_path, "rb")),
@@ -64,15 +66,12 @@ def mohirAI(file_path):
 
         print("response data")
         print(response_data)
-        task_id_temp = response_data['id']
+        task_id_temp = response_data["id"]
         print("Temp resp data")
         print(task_id_temp)
 
-        url = f'https://uzbekvoice.ai/api/v1/tasks?id={task_id}'
-        headers = {
-            'Authorization': api_key,
-            'Content-Type': 'application/json'
-        }
+        url = f"https://uzbekvoice.ai/api/v1/tasks?id={task_id}"
+        headers = {"Authorization": api_key, "Content-Type": "application/json"}
 
         while True:
             print("Started sleeping")

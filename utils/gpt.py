@@ -40,7 +40,6 @@ prompt = """
 
 
 def request_to_gpt(text, prompt):
-
     logging.warning(f"Text in function request_to_gpt: {text}")
     """
     Corrects punctuation in Uzbek language text.
