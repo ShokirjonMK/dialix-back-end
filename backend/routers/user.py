@@ -1,60 +1,22 @@
-import os
 import logging
-import datetime
-from typing import Annotated
-from platform import node as get_hostname
+import typing as t
 
-from fastapi import status
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.security import HTTPBasicCredentials
-from fastapi import FastAPI, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, status
+from fastapi.security import HTTPBasicCredentials, OAuth2PasswordRequestForm
 
 from backend import db
 from backend.database import user_service
-from backend.core.auth import (
-    generate_access_token,
-    get_current_user,
-    authenticate_user,
-)
-from backend.sockets import sio_app
 from backend.schemas import UserCreate, User
-from backend.core.lifespan import lifespan_handler
-from backend.core.logging import configure_logging
-from backend.core.exceptions import register_exception_handlers  # noqa: F401
 from backend.auth.utils import add_to_blacklist
 from backend.auth.basic import basic_auth_security, basic_auth_wrapper
+from backend.core.auth import generate_access_token, get_current_user, authenticate_user
 
-app = FastAPI(lifespan=lifespan_handler)
-
-configure_logging()
-register_exception_handlers(app)
-
-app.mount("/ws/", app=sio_app)
-
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-
-origins: list[str] = [
-    "http://localhost:3000",
-    "https://localhost:3000",
-    "https://dialix.org",
-    "https://dev.dialix.org",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+user_router = APIRouter()
 
 
-@app.post("/signup")
+@user_router.post("/signup")
 @basic_auth_wrapper
 async def signup(
     user: UserCreate,
@@ -76,7 +38,7 @@ async def signup(
     return response
 
 
-@app.post("/login")
+@user_router.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> JSONResponse:
     user = await authenticate_user(form_data.username, form_data.password)
 
@@ -89,8 +51,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> JSONRespons
     access_token = generate_access_token(data={"user_id": str(user.id)})
 
     response = JSONResponse(
-        status_code=status.HTTP_200_OK,
         content={"user": user.model_dump(mode="json"), "token_type": "bearer"},
+        status_code=status.HTTP_200_OK,
     )
 
     response.set_cookie(
@@ -104,7 +66,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> JSONRespons
     return response
 
 
-@app.post("/logout")
+@user_router.post("/logout")
 async def logout(
     request: Request, current_user: User = Depends(get_current_user)
 ) -> JSONResponse:
@@ -113,7 +75,7 @@ async def logout(
     if access_token is not None:
         await add_to_blacklist(access_token)
 
-    response = JSONResponse({"success": True})
+    response = JSONResponse({"success": True}, status_code=status.HTTP_200_OK)
     response.delete_cookie(
         key="access_token",
         httponly=True,
@@ -124,23 +86,22 @@ async def logout(
     return response
 
 
-@app.get("/me")
+@user_router.get("/me")
 def retrieve_current_user(current_user: User = Depends(get_current_user)):
     return {"user": current_user}
 
 
-@app.get("/balance")
+@user_router.get("/balance")
 def retrieve_current_user_balance(current_user: User = Depends(get_current_user)):
     balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0)
-    logging.warning("balance: %s", balance)
     return {"balance": balance}
 
 
-@app.post("/topup")
+@user_router.post("/topup")
 @basic_auth_wrapper
 def topup(
-    amount: Annotated[int, Body(...)],
-    email: Annotated[str, Body(...)],
+    amount: t.Annotated[int, Body(...)],
+    email: t.Annotated[str, Body(...)],
     credentials: HTTPBasicCredentials = Depends(basic_auth_security),
 ):
     try:
@@ -150,19 +111,9 @@ def topup(
             amount=amount,
             type="topup",
         )
-        return JSONResponse(status_code=200, content={"success": True})
-    except Exception as e:
-        logging.error(f"Error occurred while topping up: {e}")
-        return JSONResponse(status_code=400, content={"error": str(e)})
-
-
-@app.get("/health")
-def health():
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "status": "ok",
-            "hostname": get_hostname(),
-            "time": datetime.datetime.now().isoformat(),
-        },
-    )
+        return JSONResponse(status_code=status.HTTP_200_OK, content={"success": True})
+    except Exception as exc:
+        logging.error(f"Error occurred while topping up: {exc}")
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST, content={"error": str(exc)}
+        )

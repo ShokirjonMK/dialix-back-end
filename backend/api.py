@@ -6,9 +6,8 @@ import uuid
 import shutil
 import backend.db as db
 from typing import Annotated, List, Tuple, Union
-from fastapi import Depends, Body, UploadFile, Request, HTTPException
+from fastapi import Depends, Body, UploadFile, Request, HTTPException, APIRouter
 from fastapi.responses import JSONResponse
-from backend.app import app
 from utils.data_manipulation import find_operator_code, find_call_type
 from utils.storage import get_stream_url, upload_file
 from utils.audio import generate_waveform, get_audio_duration
@@ -21,6 +20,9 @@ from workers.data import upsert_data
 
 import datetime
 from datetime import datetime, timedelta
+
+
+api_router = APIRouter()
 
 
 def get_task_id(user_id):
@@ -165,7 +167,8 @@ async def process_form_data(request: Request):
         raise HTTPException(status_code=400, detail="Mismatched lengths of arrays.")
     return files, general, checklist_id, processed_files
 
-@app.get("/audios_results")
+
+@api_router.get("/audios_results")
 async def get_audio_and_results(current_user: User = Depends(get_current_user)):
     recordings = db.get_records(owner_id=str(current_user.id))
     recordings = adapt_json(recordings)
@@ -204,7 +207,7 @@ async def get_audio_and_results(current_user: User = Depends(get_current_user)):
     return JSONResponse(status_code=200, content=response)
 
 
-@app.get("/audio/file/{storage_id}")
+@api_router.get("/audio/file/{storage_id}")
 async def get_audio_file(request: Request, storage_id: str):
     # return url to audio file
     return JSONResponse(
@@ -215,7 +218,7 @@ async def get_audio_file(request: Request, storage_id: str):
     # return FileResponse(f"uploads/{storage_id}")
 
 
-@app.get("/audios_results")
+@api_router.get("/audios_results")
 async def get_audio_and_results(current_user: User = Depends(get_current_user)):
     recordings = db.get_records(owner_id=str(current_user.id))
     recordings = adapt_json(recordings)
@@ -252,7 +255,7 @@ async def get_audio_and_results(current_user: User = Depends(get_current_user)):
     return JSONResponse(status_code=200, content=response)
 
 
-@app.post("/audio", dependencies=[Depends(get_current_user)])
+@api_router.post("/audio", dependencies=[Depends(get_current_user)])
 async def analyze_data(
     processed_data: Tuple[
         List[UploadFile], List[bool], List[Union[str, None]], List[dict]
@@ -375,7 +378,7 @@ async def analyze_data(
     return JSONResponse(status_code=200, content=responses)
 
 
-@app.post("/reprocess")
+@api_router.post("/reprocess")
 async def reprocess_data(
     record: ReprocessRecord,
     current_user: User = Depends(get_current_user),
@@ -454,7 +457,7 @@ async def reprocess_data(
     return JSONResponse(status_code=200, content=response_data)
 
 
-@app.get("/dashboard")
+@api_router.get("/dashboard")
 async def results(current_user: User = Depends(get_current_user)):
     data = db.get_results(owner_id=str(current_user.id))
 
@@ -522,14 +525,14 @@ async def results(current_user: User = Depends(get_current_user)):
     return response
 
 
-@app.get("/audios/pending")
+@api_router.get("/audios/pending")
 async def get_pending_audios(current_user: User = Depends(get_current_user)):
     data = db.get_pending_audios(owner_id=str(current_user.id))
     data = adapt_json(data)
     return JSONResponse(status_code=200, content=data)
 
 
-@app.post("/checklist")
+@api_router.post("/checklist")
 async def upsert_checklist(
     data: CheckList,
     current_user: User = Depends(get_current_user),
@@ -560,7 +563,7 @@ async def upsert_checklist(
     return JSONResponse(status_code=200, content=response)
 
 
-@app.post("/activate_checklist")
+@api_router.post("/activate_checklist")
 async def activate_checklist(
     checklist_id: str, current_user: User = Depends(get_current_user)
 ):
@@ -570,14 +573,14 @@ async def activate_checklist(
     return JSONResponse(status_code=404, content={"error": "Not found"})
 
 
-@app.get("/checklists")
+@api_router.get("/checklists")
 async def get_list_of_checklists(current_user: User = Depends(get_current_user)):
     data = db.get_checklists(owner_id=str(current_user.id))
     data = adapt_json(data)
     return JSONResponse(status_code=200, content=data)
 
 
-@app.get("/checklist/{checklist_id}")
+@api_router.get("/checklist/{checklist_id}")
 async def get_checklist_by_id(
     checklist_id: str, current_user: User = Depends(get_current_user)
 ):
@@ -588,7 +591,7 @@ async def get_checklist_by_id(
     return JSONResponse(status_code=404, content={"error": "Not found"})
 
 
-@app.post("/operator")
+@api_router.post("/operator")
 async def upsert_operator(
     data: OperatorData,
     current_user: User = Depends(get_current_user),
@@ -608,7 +611,7 @@ async def upsert_operator(
     return JSONResponse(status_code=200, content=response)
 
 
-@app.get("/operators")
+@api_router.get("/operators")
 async def get_list_of_operators(current_user: User = Depends(get_current_user)):
     data = db.get_operators(owner_id=str(current_user.id))
     data = adapt_json(data)

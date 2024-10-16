@@ -1,6 +1,7 @@
-from datetime import datetime
-from pydantic import BaseModel, EmailStr, constr, Field
 import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, EmailStr, constr, Field
 
 
 class UserCreate(BaseModel):
@@ -8,7 +9,6 @@ class UserCreate(BaseModel):
     email: EmailStr
     username: constr(min_length=3, max_length=255)
     password: str
-    # TODO: Add role default to role to user.
     role: str
     company_name: str
 
@@ -24,7 +24,7 @@ class User(BaseModel):
     updated_at: datetime
 
     def hide_password(self):
-        return self.model_copy(exclude={"password": ...})
+        return self.copy(exclude={"password": ...})
 
 
 class CheckList(BaseModel):
