@@ -115,7 +115,7 @@ def calculate_daily_satisfaction(data):
 
 async def process_form_data(request: Request):
     form = await request.form()
-    current_user = get_current_user(request)
+    current_user = await get_current_user(request)
     files = form.getlist("files")
     general = [gen == "true" for gen in form.getlist("general")]
     checklist_id = [chk if chk else None for chk in form.getlist("checklist_id")]
