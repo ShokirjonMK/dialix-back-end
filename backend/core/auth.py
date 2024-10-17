@@ -1,22 +1,18 @@
-import os
 import logging
 import typing as t
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
 from jose import jwt, JWTError
-from passlib.context import CryptContext
 
-from starlette import status
+from fastapi import status
 from fastapi import HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 
-from backend.database.models import Account, BlackListToken
-from backend.database.model_schemas import AccountPydantic
+from backend.core.settings import ALGORITHM, SECRET_KEY
 
-SECRET_KEY = os.getenv("AUTH_SECRET_KEY")
-ALGORITHM = os.getenv("AUTH_ALGORITHM")
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from backend.database.model_schemas import AccountPydantic
+from backend.database.models import Account, BlackListToken
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -93,10 +89,6 @@ async def authenticate_user(username: str, password: str):
         return await AccountPydantic.from_tortoise_orm(account)
 
     return
-
-
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
 
 
 def generate_access_token(

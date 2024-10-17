@@ -10,14 +10,15 @@ from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-# from backend.api import api_router
 from backend.sockets import sio_app
 from backend.core.lifespan import lifespan_handler
 from backend.core.logging import configure_logging
-from backend.core.exceptions import register_exception_handlers  # noqa: F401
+from backend.core.exceptions import register_exception_handlers
 
 from backend.routers.user import user_router
 from backend.routers.checklist import checklist_router
+
+from backend.core import settings
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -28,40 +29,47 @@ register_exception_handlers(application)
 
 application.mount("/ws/", app=sio_app)
 
-# application.include_router(api_router)
-application.include_router(user_router)
-application.include_router(checklist_router)
 
+###
+# Setup Routers
+###
+ROUTERS = [user_router, checklist_router]
+
+if settings.ENABLE_CORE_API_MODULE:
+    from backend.api import api_router
+
+    ROUTERS.append(api_router)
+else:
+    logging.warning(
+        "CORE API module (api.py) is currently disabled for development purposes. "
+        "Refer to 'settings.py' to enable it"
+    )
+for router in ROUTERS:
+    application.include_router(router)
+
+###
+# Tensorflow & NVIDIA Cuda
+###
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
-origins: list[str] = [
-    "https://dialix.org",
-    "https://dev.dialix.org",
-    # local development
-    "http://localhost:3000",
-    "https://localhost:3000",
-]
-
-application.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+###
+# Middleware setup
+###
+application.add_middleware(CORSMiddleware, **settings.CORS_SETTINGS)
 
 
 @application.get("/health")
 async def health():
     connection = connections.get("default")
-    db_version_record = await connection.execute_query("select version();")
+    db_version_record: None = None
 
     try:
+        db_version_record = await connection.execute_query("select version();")
         db_version = db_version_record[1][0]["version"]
     except Exception as exc:
-        logging.error(f"{db_version_record=} {exc=}")
+        logging.error(f"Can't connect to database: {exc=} {db_version_record=}")
         db_version = None
 
     return JSONResponse(

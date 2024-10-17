@@ -1,25 +1,11 @@
 import logging
-from decouple import config
 from typing import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from tortoise.contrib.fastapi import RegisterTortoise
 
-DATABASE_URL: str = config("DATABASE_URL").replace("postgresql", "postgres")
-
-
-TORTOISE_CONFIG = {
-    "connections": {
-        "default": DATABASE_URL,
-    },
-    "apps": {
-        "models": {
-            "models": ["backend.database.models", "aerich.models"],
-            "default_connection": "default",
-        }
-    },
-}
+from backend.core.settings import TORTOISE_CONFIG
 
 
 @asynccontextmanager

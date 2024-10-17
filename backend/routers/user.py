@@ -7,11 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException, Body, status
 from fastapi.security import HTTPBasicCredentials, OAuth2PasswordRequestForm
 
 from backend import db
-from backend.database import user_service
 from backend.schemas import UserCreate, User
 from backend.auth.utils import add_to_blacklist
 from backend.auth.basic import basic_auth_security, basic_auth_wrapper
 from backend.core.auth import generate_access_token, get_current_user, authenticate_user
+
+from backend.services.user import create_user
 
 user_router = APIRouter()
 
@@ -22,7 +23,7 @@ async def signup(
     user: UserCreate,
     credentials: HTTPBasicCredentials = Depends(basic_auth_security),
 ) -> JSONResponse:
-    registered_user = await user_service.create_user(user.model_dump(mode="json"))
+    registered_user = await create_user(user.model_dump(mode="json"))
 
     access_token = generate_access_token(data={"user_id": str(registered_user["id"])})
 
@@ -73,7 +74,7 @@ async def logout(
     access_token: str | None = request.cookies.get("access_token")
 
     if access_token is not None:
-        await add_to_blacklist(access_token)
+        await add_to_blacklist(current_user.username, access_token)
 
     response = JSONResponse({"success": True}, status_code=status.HTTP_200_OK)
     response.delete_cookie(
