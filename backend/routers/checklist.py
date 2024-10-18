@@ -1,5 +1,6 @@
 import json
 import logging
+from uuid import UUID
 from datetime import datetime
 
 from fastapi.responses import JSONResponse
@@ -10,11 +11,47 @@ from utils.encoder import adapt_json
 from backend.schemas import User, CheckList
 from backend.core.auth import get_current_user
 
-checklist_router = APIRouter()
+from backend.services.checklist import get_checklist_by, get_single_checklist_by
+from backend.database.model_schemas import ChecklistPydantic, ChecklistPydanticList
+
+checklist_router = APIRouter(tags=["Checklist"])
 
 
-@checklist_router.post("/checklist")
-async def upsert_checklist(
+@checklist_router.get("/checklists")
+async def list_checklist(current_user: User = Depends(get_current_user)):
+    data = await get_checklist_by(owner_id=current_user.id)
+    serialized_data = await ChecklistPydanticList.from_queryset(data)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=serialized_data.model_dump(mode="python"),
+    )
+
+
+@checklist_router.get("/checklists/{checklist_id}")
+async def retrieve_checklist(
+    checklist_id: UUID, current_user: User = Depends(get_current_user)
+):
+    data = await get_single_checklist_by(
+        owner_id=current_user.id, checklist_id=checklist_id
+    )
+    logging.info(f"{data=} {not data}")
+
+    if data is None:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND, content={"detail": "Not found"}
+        )
+
+    serialized_data = await ChecklistPydantic.from_queryset_single(data)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=serialized_data.model_dump(mode="python"),
+    )
+
+
+@checklist_router.post("/checklists")
+async def create_checklist(
     data: CheckList,
     current_user: User = Depends(get_current_user),
 ):
@@ -51,28 +88,6 @@ async def activate_checklist(
     result = db.activate_checklist(checklist_id, owner_id=str(current_user.id))
     if result:
         return JSONResponse(status_code=status.HTTP_200_OK, content={"success": True})
-    return JSONResponse(
-        status_code=status.HTTP_404_NOT_FOUND, content={"error": "Not found"}
-    )
-
-
-@checklist_router.get("/checklists")
-async def get_list_of_checklists(current_user: User = Depends(get_current_user)):
-    data = db.get_checklists(owner_id=str(current_user.id))
-    data = adapt_json(data)
-
-    return JSONResponse(status_code=status.HTTP_200_OK, content=data)
-
-
-@checklist_router.get("/checklist/{checklist_id}")
-async def get_checklist_by_id(
-    checklist_id: str, current_user: User = Depends(get_current_user)
-):
-    data = db.get_checklist_by_id(checklist_id, owner_id=str(current_user.id))
-    if data:
-        data = adapt_json(data)
-        return JSONResponse(status_code=status.HTTP_200_OK, content=data)
-
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND, content={"error": "Not found"}
     )

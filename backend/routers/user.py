@@ -14,7 +14,7 @@ from backend.core.auth import generate_access_token, get_current_user, authentic
 
 from backend.services.user import create_user
 
-user_router = APIRouter()
+user_router = APIRouter(tags=["User"])
 
 
 @user_router.post("/signup")

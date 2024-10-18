@@ -61,7 +61,7 @@ application.add_middleware(CORSMiddleware, **settings.CORS_SETTINGS)
 
 
 @application.get("/health")
-async def health():
+async def healthcheck():
     connection = connections.get("default")
     db_version_record: None = None
 
