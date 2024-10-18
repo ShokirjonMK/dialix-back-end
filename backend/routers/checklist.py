@@ -19,7 +19,9 @@ checklist_router = APIRouter(tags=["Checklist"])
 
 @checklist_router.get("/checklists")
 async def list_checklist(current_user: User = Depends(get_current_user)):
-    serialized_data = await ChecklistPydanticList.from_queryset(get_checklist_by(owner_id=current_user.id))
+    serialized_data = await ChecklistPydanticList.from_queryset(
+        get_checklist_by(owner_id=current_user.id)
+    )
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -31,9 +33,7 @@ async def list_checklist(current_user: User = Depends(get_current_user)):
 async def retrieve_checklist(
     checklist_id: UUID, current_user: User = Depends(get_current_user)
 ):
-    data = get_single_checklist_by(
-        owner_id=current_user.id, checklist_id=checklist_id
-    )
+    data = get_single_checklist_by(owner_id=current_user.id, checklist_id=checklist_id)
     logging.info(f"{data=} {not data}")
 
     # if data is None:

@@ -1,11 +1,13 @@
-import datetime
-import logging
-import os
 import uuid
-import psycopg2
+import logging
+import datetime
+
 from decouple import config
-from psycopg2.extensions import register_adapter
+
+import psycopg2
+import psycopg2.extras
 from psycopg2.pool import SimpleConnectionPool
+from psycopg2.extensions import register_adapter
 
 pool: SimpleConnectionPool = None
 
@@ -74,9 +76,9 @@ def migrate_up():
             cursor.execute("SELECT * FROM migrations")
             existing_migrations = cursor.fetchall()
             connection.commit()
-        except:
+        except Exception as exc:
             connection.rollback()
-            print('Creating "migrations" table...')
+            print(f'Creating "migrations" table... {exc=}')
             cursor.execute(
                 "CREATE TABLE migrations (id varchar PRIMARY KEY, created_at timestamp NOT NULL)"
             )
@@ -266,16 +268,6 @@ def get_pending_audios(connection, owner_id: str):
         "SELECT * FROM record WHERE owner_id = %s AND status = 'PENDING'",
         (owner_id,),
     )
-
-
-@db_connection_wrapper
-def get_count_of_records(connection, owner_id: str):
-    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        cursor.execute(
-            "SELECT COUNT(*) FROM record WHERE owner_id = %s",
-            (owner_id,),
-        )
-        return dict(cursor.fetchone())
 
 
 @db_connection_wrapper
