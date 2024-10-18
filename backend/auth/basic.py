@@ -1,8 +1,9 @@
-# basic auth related stuff
-# utils, decorators
-import os
+# basic auth related stuff utils, decorators
+
 import logging
 import secrets
+
+from decouple import config
 
 from functools import wraps
 from asyncio import iscoroutinefunction
@@ -14,8 +15,8 @@ from fastapi.security import HTTPBasicCredentials, HTTPBasic
 
 basic_auth_security = HTTPBasic()
 
-SUDO_USERNAME: str = os.getenv("BASIC_AUTH_USERNAME").encode("utf-8")
-SUDO_PASSWORD: str = os.getenv("BASIC_AUTH_PASSWORD").encode("utf-8")
+SUDO_USERNAME: str = config("BASIC_AUTH_USERNAME").encode("utf-8")
+SUDO_PASSWORD: str = config("BASIC_AUTH_PASSWORD").encode("utf-8")
 
 
 def basic_auth_wrapper(endpoint):

@@ -4,6 +4,8 @@ import os
 
 import openai
 
+from decouple import config
+
 from utils.storage import download_file, file_exists
 from workers.common import celery, PredictTask
 from utils.data_manipulation import (
@@ -36,7 +38,7 @@ courses_list = [
     "Kiberxavfsizlik: Pentesting",
     "Computer Vision",
     "Data Science va Sun'iy Intellekt",
-    "Sunʼiy intellekt - NLP (nutq bilan ishlash)",
+    "Sun'iy intellekt - NLP (nutq bilan ishlash)",
     "No-Code: Kod yozmasdan sayt tuzish",
     "QA - testing va avtomatlashtirish",
     "Project Management",
@@ -69,10 +71,10 @@ general_prompt = """
     }
 """
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
-openai.api_base = os.getenv("OPENAI_API_BASE")
-openai.api_type = os.getenv("OPENAI_API_TYPE")
-openai.api_version = os.getenv("OPENAI_API_VERSION")
+openai.api_key = config("OPENAI_API_KEY")
+openai.api_base = config("OPENAI_API_BASE")
+openai.api_type = config("OPENAI_API_TYPE")
+openai.api_version = config("OPENAI_API_VERSION")
 
 
 def general_checker(text, general_prompt, courses_list, checklist=None):
@@ -81,7 +83,7 @@ def general_checker(text, general_prompt, courses_list, checklist=None):
     else:
         prompt = general_prompt.replace("[courses_list]", str(courses_list))
 
-    deployment_name = os.getenv("DEPLOYMENT_NAME", "gpt4")
+    deployment_name = config("DEPLOYMENT_NAME", default="gpt4")
 
     try:
         response = openai.ChatCompletion.create(
@@ -121,7 +123,7 @@ def api_processing(self: PredictTask, **kwargs):
 
     file_path = os.path.join("uploads", record["storage_id"])
     if not os.path.exists(file_path):
-        bucket = os.getenv("STORAGE_BUCKET_NAME", "dialixai-production")
+        bucket = config("STORAGE_BUCKET_NAME", default="dialixai-production")
         remote_path = f"{folder_name}/{record['storage_id']}"
         if not file_exists(remote_path):
             logging.error(f"File not found in the storage: {remote_path}")

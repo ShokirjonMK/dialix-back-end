@@ -3,7 +3,7 @@ import logging
 import os
 import uuid
 import psycopg2
-from psycopg2.extras import DictCursor
+from decouple import config
 from psycopg2.extensions import register_adapter
 from psycopg2.pool import SimpleConnectionPool
 
@@ -20,7 +20,7 @@ register_adapter(uuid.UUID, adapt_uuid)
 def get_pool():
     global pool
     if pool is None:
-        dsn = os.getenv("DATABASE_URL")
+        dsn = config("DATABASE_URL")
         pool = SimpleConnectionPool(minconn=1, maxconn=10, dsn=dsn)
     return pool
 

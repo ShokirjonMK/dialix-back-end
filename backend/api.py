@@ -5,6 +5,7 @@ import json
 import shutil
 import logging
 import tarfile
+from decouple import config
 from typing import List, Tuple, Union
 from datetime import datetime, timedelta
 
@@ -284,7 +285,7 @@ async def analyze_data(
         storage_id = processed_file["file_path"].split("/")[-1]
         file_path = processed_file["file_path"]
         duration = processed_file["duration"]
-        bucket = os.getenv("STORAGE_BUCKET_NAME", "dialixai-production")
+        bucket = config("STORAGE_BUCKET_NAME", default="dialixai-production")
 
         folder_name = current_user.company_name.lower().replace(" ", "_")
 
