@@ -1,7 +1,6 @@
 import logging
-import os
 import openai
-
+from decouple import config
 
 prompt = """
     Here is a conversation between a customer and an operator. The customer is interested in buying an online IT course. The operator is trying to sell the course to the customer. The conversation is in Uzbek language. According to the conversation, answer the following questions and return in json format with the following:
@@ -51,7 +50,7 @@ def request_to_gpt(text, prompt):
     - str: The corrected text.
     """
 
-    deployment_name = os.getenv("DEPLOYMENT_NAME", "gpt4")
+    deployment_name = config("DEPLOYMENT_NAME", default="gpt4")
 
     try:
         # response = openai.ChatCompletion.create(

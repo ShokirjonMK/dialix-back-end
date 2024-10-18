@@ -6,8 +6,12 @@ import torch
 import librosa
 import numpy as np
 import soundfile as sf
-from celery import Celery
+
 from celery import Task
+from celery import Celery
+
+from decouple import config
+
 from librosa import LibrosaError
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Dropout
@@ -37,7 +41,7 @@ class PredictTask(Task):
     def __call__(self, *args, **kwargs):
         if self.model_gender is None:
             try:
-                model_path = os.getenv("MODEL_PATH", "./models/model.h5")
+                model_path = config("MODEL_PATH", default="./models/model.h5")
                 if not os.path.exists(model_path):
                     raise FileNotFoundError(
                         f"No such file or directory: '{model_path}'"
@@ -299,8 +303,8 @@ class PredictTask(Task):
 
 celery = Celery(
     "workers",
-    broker=os.getenv("AMQP_URL", "amqp://guest:guest@localhost:5672"),
-    backend=os.getenv("REDIS_URL", "redis://localhost:6380/0"),
+    broker=config("AMQP_URL", default="amqp://guest:guest@localhost:5672"),
+    backend=config("REDIS_URL", default="redis://localhost:6380/0"),
 )
 
 celery.conf.update(
