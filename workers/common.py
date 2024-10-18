@@ -299,9 +299,16 @@ class PredictTask(Task):
 
 celery = Celery(
     "workers",
-    broker=os.getenv("AMQP_URL", "amqp://guest:guest@localhost:5672//"),
+    broker=os.getenv("AMQP_URL", "amqp://guest:guest@localhost:5672"),
     backend=os.getenv("REDIS_URL", "redis://localhost:6380/0"),
 )
-celery.conf.broker_connection_retry_on_startup = True
+
+celery.conf.update(
+    broker_connection_retry=True,
+    broker_connection_retry_on_startup=True,
+    broker_connection_max_retries=100,
+    broker_connection_retry_delay=5.0,
+)
+
 
 celery.task(base=PredictTask)
