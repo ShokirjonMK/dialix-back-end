@@ -1,27 +1,39 @@
-import json
-import logging
-import math
 import os
 import uuid
+import math
+import json
 import shutil
-import backend.db as db
+import logging
+import tarfile
 from typing import List, Tuple, Union
+from datetime import datetime, timedelta
+
+import requests
+
+from celery.result import AsyncResult
+
 from fastapi import Depends, UploadFile, Request, HTTPException, APIRouter
 from fastapi.responses import JSONResponse
-from utils.data_manipulation import find_operator_code, find_call_type
+
+from backend import db
+from backend.core.auth import get_current_user
+from backend.schemas import User, ReprocessRecord, OperatorData, CallHistoryRequest
+
 from utils.storage import get_stream_url, upload_file
 from utils.audio import get_audio_duration
 from utils.encoder import adapt_json
-from workers.api import api_processing
-from backend.core.auth import get_current_user
-from backend.schemas import User, ReprocessRecord, OperatorData
-from celery.result import AsyncResult
-from workers.data import upsert_data
+from utils.data_manipulation import find_operator_code, find_call_type
 
-from datetime import datetime, timedelta
+from workers.api import api_processing
+from workers.data import upsert_data
 
 
 api_router = APIRouter()
+
+PBX_URL = "https://api.onlinepbx.ru/{domain}"
+
+MAX_FILE_SIZE_MB = 15
+SUPPORTED_FORMATS = [".mp3", ".wav", ".aac"]
 
 
 def get_task_id(user_id):
@@ -556,3 +568,201 @@ async def get_list_of_operators(current_user: User = Depends(get_current_user)):
     data = db.get_operators(owner_id=str(current_user.id))
     data = adapt_json(data)
     return JSONResponse(status_code=200, content=data)
+
+
+@api_router.post("/auth/{domain}")
+def authenticate(domain: str, api_key: str):
+    url = PBX_URL.format(domain=domain)
+    data = {"auth_key": api_key}
+
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json",
+    }
+
+    try:
+        response = requests.post(f"{url}/auth.json", headers=headers, data=data)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Error authenticating: {str(e)}")
+
+
+@api_router.post("/users/{domain}")
+def get_users(domain: str, key_id: str, key: str):
+    headers = {
+        "x-pbx-authentication": f"{key_id}:{key}",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+
+    try:
+        response = requests.post(
+            f"{PBX_URL.format(domain=domain)}/user/get.json", headers=headers
+        )
+
+        if response.status_code == 200:
+            json_response = response.json()
+
+            return JSONResponse(status_code=200, content=json_response)
+        else:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching call history: {str(e)}"
+        )
+
+
+@api_router.post("/groups/{domain}")
+def get_groups(domain: str, key_id: str, key: str):
+    headers = {
+        "x-pbx-authentication": f"{key_id}:{key}",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+
+    try:
+        response = requests.post(
+            f"{PBX_URL.format(domain=domain)}/group/get.json", headers=headers
+        )
+
+        if response.status_code == 200:
+            json_response = response.json()
+
+            return JSONResponse(status_code=200, content=json_response)
+        else:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching call history: {str(e)}"
+        )
+
+
+def download_tar_file(url: str, save_path: str) -> str:
+    """
+    Downloads the tar file from the given URL and saves it to the specified path.
+
+    :param url: URL to download the tar file from
+    :param save_path: Path to save the downloaded tar file
+    :return: Path to the saved tar file
+    """
+    try:
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+
+        # Save the file
+        with open(save_path, "wb") as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+        return save_path
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error downloading tar file: {str(e)}"
+        )
+
+
+def extract_tar_file(tar_path: str, extract_to: str) -> None:
+    """
+    Extracts the contents of a tar file to the specified directory.
+
+    :param tar_path: Path to the tar file
+    :param extract_to: Directory to extract the tar file contents
+    """
+    try:
+        with tarfile.open(tar_path, "r") as tar:
+            tar.extractall(path=extract_to)
+    except (tarfile.TarError, IOError) as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error extracting tar file: {str(e)}"
+        )
+
+
+@api_router.post("/history/{domain}")
+def get_calls_history(
+    request: CallHistoryRequest,
+    domain: str,
+    key_id: str,
+    key: str,
+    current_user: User = Depends(get_current_user),
+):
+    data = request.dict(exclude_none=True)
+
+    headers = {
+        "x-pbx-authentication": f"{key_id}:{key}",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+
+    try:
+        response = requests.post(
+            f"{PBX_URL.format(domain=domain)}/mongo_history/search.json",
+            headers=headers,
+            data=data,
+        )
+
+        if response.status_code == 200:
+            json_response = response.json()
+
+            download_url = json_response.get("data")
+            if isinstance(download_url, str):
+                tar_file_path = "./tmp/calls.tar"
+                extract_dir = "./audios"
+                os.makedirs(extract_dir, exist_ok=True)
+                downloaded_file = download_tar_file(download_url, tar_file_path)
+                extract_tar_file(downloaded_file, extract_dir)
+                extracted_files = os.listdir(extract_dir)
+
+                audio_folder = "./audios"
+                files_to_send = []
+                processed_files = []
+
+                for filename in extracted_files:
+                    file_path = os.path.join(audio_folder, filename)
+
+                    if os.path.exists(file_path):
+                        with open(file_path, "rb") as audio_file:
+                            upload_file = UploadFile(audio_file, filename=filename)
+                            files_to_send.append(upload_file)
+
+                        processed_files.append({"file_path": file_path, "duration": 0})
+
+                processed_data = (
+                    files_to_send,
+                    [False] * len(files_to_send),
+                    [None] * len(files_to_send),
+                    processed_files,
+                )
+                response = analyze_data(
+                    processed_data=processed_data, current_user=current_user
+                )
+
+                try:
+                    for filename in extracted_files:
+                        file_path = os.path.join(extract_dir, filename)
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+
+                    if os.path.exists(tar_file_path):
+                        os.remove(tar_file_path)
+                except Exception as cleanup_error:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Error during cleanup: {str(cleanup_error)}",
+                    )
+
+                return response
+            else:
+                return JSONResponse(status_code=200, content=json_response)
+        else:
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching call history: {str(e)}"
+        )
