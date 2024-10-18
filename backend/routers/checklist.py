@@ -23,7 +23,7 @@ async def list_checklist(current_user: User = Depends(get_current_user)):
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=serialized_data.model_dump(mode="python"),
+        content=serialized_data.model_dump(mode="json"),
     )
 
 
@@ -45,7 +45,7 @@ async def retrieve_checklist(
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content=serialized_data.model_dump(mode="python"),
+        content=serialized_data.model_dump(mode="json"),
     )
 
 
