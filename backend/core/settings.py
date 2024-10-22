@@ -52,6 +52,8 @@ SECRET_KEY: str = config("AUTH_SECRET_KEY")
 # Other
 ##
 
+PBX_API_URL = "https://api.onlinepbx.ru/{domain}"
+
 # api.py is slowing down startup process.
 # currently, I may not need this module
 ENABLE_CORE_API_MODULE: bool = config("ENABLE_CORE_API_MODULE", cast=bool, default=True)

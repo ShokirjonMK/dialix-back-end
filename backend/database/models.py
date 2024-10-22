@@ -93,6 +93,9 @@ class OperatorData(Model):
     updated_at = fields.DatetimeField(auto_now=True)
     deleted_at = fields.DatetimeField(null=True)
 
+    class Meta:
+        table = "operator_data"
+
 
 class BlackListToken(Model):
     value = fields.TextField()

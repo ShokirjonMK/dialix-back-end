@@ -8,7 +8,7 @@ from fastapi.security import HTTPBasicCredentials, OAuth2PasswordRequestForm
 
 from backend import db
 from backend.schemas import UserCreate, User
-from backend.auth.utils import add_to_blacklist
+from backend.utils.auth import add_to_blacklist
 from backend.auth.basic import basic_auth_security, basic_auth_wrapper
 from backend.core.auth import generate_access_token, get_current_user, authenticate_user
 
