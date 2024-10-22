@@ -97,7 +97,7 @@ def calculate_daily_satisfaction(data):
     # Distribute satisfaction counts into the respective dictionaries
     for entry in data:
         date_of_result = datetime.strptime(
-            entry["result_created_at"].replace("+00", "+0000"), "%Y-%m-%d %H:%M:%S.%f%z"
+            entry["result_created_at"], "%Y-%m-%dT%H:%M:%S.%f"
         ).date()
         date_str = date_of_result.strftime("%Y-%m-%d")
         if entry["is_customer_satisfied"]:
