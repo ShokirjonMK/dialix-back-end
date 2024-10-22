@@ -1,7 +1,5 @@
 import uuid
 
-from datetime import datetime, timezone
-
 from tortoise import fields
 from tortoise.models import Model
 
@@ -14,11 +12,7 @@ class Account(Model):
     role = fields.CharField(max_length=255)
     company_name = fields.CharField(max_length=255)
     updated_at = fields.DatetimeField(auto_now=True)
-    created_at = fields.DatetimeField(default=lambda: datetime.now(timezone.utc))
-
-    async def save(self, *args, **kwargs):
-        self.updated_at = datetime.now(timezone.utc)
-        await super().save(*args, **kwargs)
+    created_at = fields.DatetimeField(auto_now_add=True)
 
     class PydanticMeta:
         exclude = ("password",)
