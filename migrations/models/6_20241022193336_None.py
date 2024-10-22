@@ -11,7 +11,7 @@ async def upgrade(db: BaseDBAsyncClient) -> str:
     "role" VARCHAR(255) NOT NULL,
     "company_name" VARCHAR(255) NOT NULL,
     "updated_at" TIMESTAMPTZ NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-    "created_at" TIMESTAMPTZ NOT NULL
+    "created_at" TIMESTAMPTZ NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS "blacklisttoken" (
     "id" SERIAL NOT NULL PRIMARY KEY,

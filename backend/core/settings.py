@@ -39,6 +39,8 @@ TORTOISE_CONFIG: dict[str, t.Any] = {
             "default_connection": "default",
         }
     },
+    "use_tz": False,
+    "timezone": "UTC",
 }
 
 ###
