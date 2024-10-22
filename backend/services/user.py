@@ -1,6 +1,6 @@
 from backend.database.models import Account
 
-from backend.auth.utils import hashify
+from backend.utils.auth import hashify
 
 
 async def create_user(user_data: dict) -> dict:
