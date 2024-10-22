@@ -13,4 +13,4 @@ async def create_user(user_data: dict) -> dict:
         company_name=user_data["company_name"],
     )
 
-    return {**user_data, "id": str(user.id)}
+    return {"id": str(user.id), **user_data}
