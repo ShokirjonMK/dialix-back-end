@@ -167,7 +167,7 @@ async def process_from_call_history(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User did not say any word, and we need to analyse that?",
         )
-    
+
     download_url = download_url_response.get("data")
 
     filename = f"call-{request.uuid}.mp3"
@@ -181,7 +181,7 @@ async def process_from_call_history(
 
     processed_data = (
         [upload_file],
-        [False],
+        [True],
         [request.checklist_id],
         [{"file_path": download_file_path, "duration": call_info["duration"]}],
     )
