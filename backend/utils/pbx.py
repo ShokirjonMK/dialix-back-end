@@ -65,6 +65,10 @@ def get_call_download_url(data: dict, url: str, key_id: str, key: str) -> dict:
     return response.json()
 
 
+def filter_calls(calls: list[dict]) -> list[dict]:
+    return list(filter(lambda entry: entry["user_talk_time"] != 0, calls))
+
+
 def paginate_response(
     array: list[t.Any], page_number: int, page_size: t.Optional[int] = 10
 ) -> list[t.Any]:

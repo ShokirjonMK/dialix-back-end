@@ -15,6 +15,7 @@ from backend.utils.pbx import (
     get_call_info_by,
     get_call_download_url,
     paginate_response,
+    filter_calls,
 )
 
 pbx_router = APIRouter(tags=["PBX Integration"])
@@ -123,14 +124,13 @@ async def list_call_history(
         )
 
         json_response = response.json()
+        logging.info(f"Total number of calls is {len(json_response['data'] )}")
 
-        logging.info(
-            f"Response status {response.status_code}, number of calls is {len(json_response['data'] )}"
-        )
+        filtered_calls = filter_calls(json_response["data"])
+        logging.info(f"Number of filtered calls: {len(filtered_calls)}")
 
-        response_content = paginate_response(
-            json_response["data"], page_number, page_size
-        )
+        response_content = paginate_response(filtered_calls, page_number, page_size)
+
         return JSONResponse(content=response_content, status_code=status.HTTP_200_OK)
 
     except requests.exceptions.RequestException as exc:
@@ -162,6 +162,12 @@ async def process_from_call_history(
             detail=f"Error on fetching call history: {exc}",
         )
 
+    if call_info["user_talk_time"] == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User did not say any word, and we need to analyse that?",
+        )
+    
     download_url = download_url_response.get("data")
 
     filename = f"call-{request.uuid}.mp3"
