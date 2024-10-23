@@ -273,20 +273,24 @@ def get_pending_audios(connection, owner_id: str):
 @db_connection_wrapper
 def upsert_checklist(connection, checklist: dict):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        keys = [
-            key for key in checklist.keys() if key not in ["created_at", "updated_at"]
-        ]
+        keys = [key for key in checklist if key not in ["created_at", "updated_at"]]
         id = checklist["id"]
 
         cursor.execute(
-            f"INSERT INTO checklist ({', '.join(keys)}) VALUES ({', '.join(['%s'] * len(keys))}) ON CONFLICT (id) DO UPDATE SET {', '.join([f'{key} = %s' for key in keys])}, updated_at = NOW() WHERE checklist.id = %s RETURNING *",
+            f"""
+            INSERT INTO checklist ({', '.join(keys)}) 
+            VALUES ({', '.join(['%s'] * len(keys))}) 
+            ON CONFLICT (id) DO UPDATE 
+            SET {', '.join([f'{key} = %s' for key in keys])}, 
+                updated_at = NOW() 
+            WHERE checklist.id = %s 
+            RETURNING *
+            """,
             tuple(
                 [
-                    (
-                        psycopg2.extras.Json(checklist[key])
-                        if key == "payload" and isinstance(checklist[key], dict)
-                        else checklist[key]
-                    )
+                    psycopg2.extras.Json(checklist[key])
+                    if key == "payload"
+                    else checklist[key]
                     for key in keys
                 ]
             )
@@ -295,6 +299,26 @@ def upsert_checklist(connection, checklist: dict):
         )
 
         return dict(cursor.fetchone())
+
+
+@db_connection_wrapper
+def update_checklist(connection, checklist_id: str, update_data: dict):
+    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+        keys = [f"{key} = %s" for key in update_data]
+        values = list(update_data.values())
+
+        cursor.execute(
+            f"""
+            UPDATE checklist 
+            SET {', '.join(keys)}, updated_at = NOW() 
+            WHERE id = %s 
+            RETURNING *
+            """,
+            values + [checklist_id],
+        )
+
+        updated_checklist = cursor.fetchone()
+        return dict(updated_checklist) if updated_checklist else None
 
 
 @db_connection_wrapper

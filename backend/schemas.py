@@ -2,7 +2,7 @@ import typing as t
 from uuid import UUID, uuid4
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, StringConstraints
+from pydantic import BaseModel, EmailStr, Field, StringConstraints, root_validator
 
 
 class UserCreate(BaseModel):
@@ -31,9 +31,33 @@ class User(BaseModel):
 class CheckList(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     title: str
-    payload: list = []
+    payload: t.Union[t.List[str], t.Dict[str, t.List[str]]] = []
     active: bool = False
     deleted_at: str = ""
+
+    @root_validator(pre=True)
+    def validate_payload(cls, values):
+        payload = values.get("payload")
+        # title = values.get("title")
+
+        if isinstance(payload, list):
+            values["payload"] = {"segment_1": payload}
+
+        elif isinstance(payload, dict):
+            for key, segment in payload.items():
+                if not isinstance(segment, list) or not all(
+                    isinstance(i, str) for i in segment
+                ):
+                    raise ValueError(f"Segment {key=} must be a list of strings")
+
+        return values
+
+
+class CheckListUpdate(BaseModel):
+    title: t.Optional[str] = None
+    payload: t.Optional[t.Union[t.List[str], t.Dict[str, t.List[str]]]] = None
+    active: t.Optional[bool] = None
+    deleted_at: t.Optional[str] = None
 
 
 class Record(BaseModel):
