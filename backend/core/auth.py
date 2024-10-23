@@ -82,7 +82,7 @@ async def authenticate_user(username: str, password: str):
 
     if account is None:
         return
-    
+
     password_matches: bool = bcrypt.checkpw(
         password=password.encode("utf-8"),
         hashed_password=account.password.encode("utf-8"),
