@@ -21,17 +21,27 @@ import backend.db as db
 from utils.mohirai import mohirAI
 
 checklist_prompt = """
-    You are given a conversation between a call center operator and a potential customer. The operator should ask certain questions from the list below. 
-    Your task is to identify if questions are asked or not. If a question is asked then you should return  "question content": true, if not asked "question content": false
-
-    Response format: 
+    You are given a conversation between a call center operator and a potential customer. 
+    The operator should ask certain questions from the list below, organized by segments. 
+    Your task is to identify if each question is asked or not within each segment. 
+    If a question is asked, return "question content": true; if not asked, return "question content": false.
+    Response format:
     {
-    "Question Content 1": true or false # true if asked, false if not asked,
-    "Question Content 2": true or false # true if asked, false if not asked,
-    ...
+        "segment_title 1": {
+            "Question content1": true or false, # true if asked, false if not asked
+            "Question content2": true or false  # true if asked, false if not asked
+        },
+        "segment_title 2": {
+            "Question content3": true or false, # true if asked, false if not asked
+            "Question content4": true or false  # true if asked, false if not asked
+        }
     }
 
-    Here is the list of questions:
+    Here is the list of segments and their respective questions:
+    {
+        "segment_title 1": ["Question content1", "Question content2"],
+        "segment_title 2": ["Question content3", "Question content4"]
+    }
 """
 
 courses_list = [
