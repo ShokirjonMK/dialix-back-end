@@ -113,31 +113,29 @@ async def list_call_history(
 ):
     url = f"{settings.PBX_API_URL.format(domain=domain)}/mongo_history/search.json"
 
-    try:
-        response = requests.post(
-            url,
-            headers={
-                "x-pbx-authentication": f"{key_id}:{key}",
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            data={"start_stamp_from": start_stamp_from, "end_stamp_to": end_stamp_to},
-        )
-
-        json_response = response.json()
-        logging.info(f"Total number of calls is {len(json_response['data'] )}")
-
-        filtered_calls = filter_calls(json_response["data"])
-        logging.info(f"Number of filtered calls: {len(filtered_calls)}")
-
-        response_content = paginate_response(filtered_calls, page_number, page_size)
-
-        return JSONResponse(content=response_content, status_code=status.HTTP_200_OK)
-
-    except requests.exceptions.RequestException as exc:
+    response = requests.post(
+        url,
+        headers={
+            "x-pbx-authentication": f"{key_id}:{key}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        data={"start_stamp_from": start_stamp_from, "end_stamp_to": end_stamp_to},
+    )
+    response.raise_for_status()
+    json_response = response.json()
+    if int(json_response["status"]) == 0:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error on fetching call history: {exc}",
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=json_response["comment"]
         )
+
+    logging.info(f"Total number of calls is {len(json_response['data'] )}")
+
+    filtered_calls = filter_calls(json_response["data"])
+    logging.info(f"Number of filtered calls: {len(filtered_calls)}")
+
+    response_content = paginate_response(filtered_calls, page_number, page_size)
+
+    return JSONResponse(content=response_content, status_code=status.HTTP_200_OK)
 
 
 @pbx_router.post("/history/{domain}")
@@ -152,15 +150,15 @@ async def process_from_call_history(
 
     url = f"{settings.PBX_API_URL.format(domain=domain)}/mongo_history/search.json"
 
-    try:
-        call_info_response = get_call_info_by(request.uuid, url, key_id, key)
-        call_info = call_info_response["data"][0]
-        download_url_response = get_call_download_url(data, url, key_id, key)
-    except requests.exceptions.RequestException as exc:
+    call_info_response = get_call_info_by(request.uuid, url, key_id, key)
+    if int(call_info_response["status"]) == 0:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error on fetching call history: {exc}",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=call_info_response["comment"],
         )
+    
+    call_info = call_info_response["data"][0]
+    download_url_response = get_call_download_url(data, url, key_id, key)
 
     if call_info["user_talk_time"] == 0:
         raise HTTPException(

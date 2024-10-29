@@ -382,6 +382,8 @@ def upsert_result(
     connection,
     result: dict,
 ):
+    logging.info(f"Inserting result data: {result=}")
+
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         keys = [key for key in result.keys() if key not in ["created_at", "updated_at"]]
         id = result["id"]

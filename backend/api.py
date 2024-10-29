@@ -196,7 +196,6 @@ async def get_audio_and_results(current_user: User = Depends(get_current_user)):
         if result:
             summary = result.get("summary", None)
             checklist_result = result.get("checklist_result", None)
-            logging.info(f"{checklist_result=}")
             if summary and checklist_result:
                 record["result"] = adapt_json(result)
                 full_audios.append(record)
