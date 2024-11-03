@@ -71,7 +71,7 @@ general_prompt = """
     Here is a conversation between a customer and an operator. The customer is interested in buying an online IT course. The operator is trying to sell the course to the customer. The conversation is in Uzbek language. According to the conversation, answer the following questions and return in json format with the following:
     Response format: {
         "is_conversation_over": true or false,
-        "call_purpose": "Provide a reason of the call. Call could be because of following reasons ["Ma'lumot olish","Pulni Qaytarish","Kurs sotib olish","Texnik muammo","To'lov masalasi","Dars sifati"]"
+        "call_purpose": "Provide a reason of the call. Call could be because of following reasons ["Ma'lumot olish","Pulni Qaytarish","Kurs sotib olish","Texnik muammo","To'lov masalasi","Dars sifati"]",
         "sentiment_analysis_of_conversation": "positive" or "negative" or "neutral",
         "reason_for_conversation_sentiment": "Provide a reason for the sentiment analysis within 30 words. Reason should be in Uzbek language. Reason should be detailed and tell clear things not general language. Provide steps for improvement if negative sentiment.",
         "sentiment_analysis_of_operator": "positive" or "negative" or "neutral",
