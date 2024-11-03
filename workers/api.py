@@ -70,26 +70,26 @@ courses_list = [
 general_prompt = """
     Here is a conversation between a customer and an operator. The customer is interested in buying an online IT course. The operator is trying to sell the course to the customer. The conversation is in Uzbek language. According to the conversation, answer the following questions and return in json format with the following:
     Response format: {
-        "is_conversation_over": true or false,
-        "call_purpose": "Provide a reason of the call. Call could be because of following reasons ["Ma'lumot olish","Pulni Qaytarish","Kurs sotib olish","Texnik muammo","To'lov masalasi","Dars sifati"]",
-        "sentiment_analysis_of_conversation": "positive" or "negative" or "neutral",
-        "reason_for_conversation_sentiment": "Provide a reason for the sentiment analysis within 30 words. Reason should be in Uzbek language. Reason should be detailed and tell clear things not general language. Provide steps for improvement if negative sentiment.",
-        "sentiment_analysis_of_operator": "positive" or "negative" or "neutral",
-        "reason_for_operator_sentiment": "Provide a reason for the sentiment analysis within 30 words. Reason should be in Uzbek language. Reason should be detailed and tell clear things not general language. Provide steps for improvement if negative sentiment.",
-        "list_of_words_define_operator_sentiment": ["word1", "word2", "word3",...] or None, list 5 words that define operator sentiment,
-        "sentiment_analysis_of_customer": "positive" or "negative" or "neutral",
-        "reason_for_customer_sentiment": "Provide a reason for the sentiment analysis within 30 words. Reason should be in Uzbek language. Reason should be detailed and tell clear things not general language. Provide steps for improvement if negative sentiment.",
-        "list_of_words_define_customer_sentiment": ["word1", "word2", "word3",...] or None, list 5 words that define customer sentiment,
-        "is_customer_satisfied": true or false,
-        "is_customer_agreed_to_buy": true or false,
-        "reason_for_customer_purchase": "Provide a reason for the purchase decision within 50 words. You can add a few more words if it is hard to desribe the reason within 50 words.",
-        "is_customer_interested_to_product": true or false,
-        "how_old_is_customer": integer or None,
-        "which_course_customer_interested": [courses_list] or None use correct course name if customer interested to product it might be multiple courses,
-        "which_platform_customer_found_about_the_course": "Facebook" or "Instagram" or "Telegram" or "Banners" or "Relatives" or "Friends" or Choose None if not mentioned,
-        "summary": "The summary of the conversation in Uzbek language with punctuation corrected and around 50 words. Summarize as checker's discretion."
-        
-    }
+    "is_conversation_over": true or false,
+    "call_purpose": "Choose from: Ma'lumot olish, Pulni Qaytarish, Kurs sotib olish, Texnik muammo, To'lov masalasi, Dars sifati",
+    "sentiment_analysis_of_conversation": "positive" or "negative" or "neutral",
+    "reason_for_conversation_sentiment": "Detailed explanation in Uzbek within 30 words. Provide clear improvement steps if negative sentiment.",
+    "sentiment_analysis_of_operator": "positive" or "negative" or "neutral",
+    "reason_for_operator_sentiment": "Detailed explanation in Uzbek within 30 words. Provide clear improvement steps if negative sentiment.",
+    "list_of_words_define_operator_sentiment": ["word1", "word2", "word3", "word4", "word5"] or None,
+    "sentiment_analysis_of_customer": "positive" or "negative" or "neutral",
+    "reason_for_customer_sentiment": "Detailed explanation in Uzbek within 30 words. Provide clear improvement steps if negative sentiment.",
+    "list_of_words_define_customer_sentiment": ["word1", "word2", "word3", "word4", "word5"] or None,
+    "is_customer_satisfied": true or false,
+    "is_customer_agreed_to_buy": true or false,
+    "reason_for_customer_purchase": "Reason for decision in 50 words (flexible by a few words if needed).",
+    "is_customer_interested_to_product": true or false,
+    "how_old_is_customer": integer or None,
+    "which_course_customer_interested": ["course1", "course2"] or None,  // Use exact course names if available,
+    "which_platform_customer_found_about_the_course": "Facebook" or "Instagram" or "Telegram" or "Banners" or "Relatives" or "Friends" or None,
+    "summary": "Uzbek language summary, punctuated correctly, around 50 words."
+}
+
 """
 
 openai.api_key = config("OPENAI_API_KEY")
