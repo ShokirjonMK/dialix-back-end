@@ -17,6 +17,7 @@ def extract_specific_part(input_str):
 
 
 def convert_string_to_json(input_str):
+    input_str = input_str.replace("None", "null")
     logging.info(f"Converting string to json: {input_str=}")
 
     try:
