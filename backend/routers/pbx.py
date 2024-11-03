@@ -156,7 +156,7 @@ async def process_from_call_history(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=call_info_response["comment"],
         )
-    
+
     call_info = call_info_response["data"][0]
     download_url_response = get_call_download_url(data, url, key_id, key)
 

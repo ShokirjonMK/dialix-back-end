@@ -81,7 +81,7 @@ def upsert_data(self: PredictTask, *args, **kwargs):
             checklist_response = json.loads(
                 checklist_response.strip("`").strip("json").strip("\n")
             )
-        
+
         db.upsert_result(
             result={
                 "id": str(existing_result_id if existing_result_id else result_id),

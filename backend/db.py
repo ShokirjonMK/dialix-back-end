@@ -243,10 +243,26 @@ def remove_record(connection, record_id: str, owner_id: str):
 
 
 @db_connection_wrapper
-def get_records(connection, owner_id: str):
+def get_records_v1(connection, owner_id: str):
     return select_many(
         connection,
         "SELECT * FROM record WHERE owner_id = %s",
+        (owner_id,),
+    )
+
+
+@db_connection_wrapper
+def get_records_v2(connection, owner_id: str):
+    """Optimized version of previous one (line: 246)
+    Difference: it will only select conversation_text from payload::json
+    """
+    return select_many(
+        connection,
+        "select"
+        " id, owner_id, title, duration, operator_code, operator_name,"
+        " call_type, source, status, storage_id, created_at, updated_at,"
+        " deleted_at, payload#>'{result,conversation_text}' as conversation_text"
+        " from record where owner_id = %s",
         (owner_id,),
     )
 
