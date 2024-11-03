@@ -1,7 +1,6 @@
 import os
 import uuid
 import math
-import json
 import shutil
 import logging
 from decouple import config
@@ -179,10 +178,50 @@ async def process_form_data(request: Request):
 
 @api_router.get("/audios_results")
 async def get_audio_and_results(current_user: User = Depends(get_current_user)):
+    recordings = db.get_records_v1(owner_id=str(current_user.id))
+    recordings = adapt_json(recordings)
+    just_audios = []
+    audios_with_checklist = []
+    general_audios = []
+    full_audios = []
+    folder_name = current_user.company_name.lower().replace(" ", "_")
+    for record in recordings:
+        result = db.get_result_by_record_id(record["id"], owner_id=str(current_user.id))
+        audio_url = get_stream_url(f"{folder_name}/{record['storage_id']}")
+        record["audio_url"] = audio_url
+
+        if result:
+            summary = result.get("summary", None)
+            checklist_result = result.get("checklist_result", None)
+            if summary and checklist_result:
+                record["result"] = adapt_json(result)
+                full_audios.append(record)
+            elif checklist_result:
+                record["result"] = adapt_json(result)
+                audios_with_checklist.append(record)
+            else:
+                record["result"] = adapt_json(result)
+                general_audios.append(record)
+        else:
+            record["result"] = None
+            just_audios.append(record)
+    response = {
+        "just_audios": just_audios,
+        "audios_with_checklist": audios_with_checklist,
+        "general_audios": general_audios,
+        "full_audios": full_audios,
+        "recordings": recordings,
+    }
+
+    return JSONResponse(status_code=200, content=response)
+
+
+@api_router.get("/v2/audios_results")
+async def get_audio_and_results_v2(current_user: User = Depends(get_current_user)):
     recordings = db.get_records_v2(
         owner_id=str(current_user.id)
     )  # use v1 if you wanna offset stuff.
-    
+
     recordings = adapt_json(recordings)
 
     folder_name = current_user.company_name.lower().replace(" ", "_")
