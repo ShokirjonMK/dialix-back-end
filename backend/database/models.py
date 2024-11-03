@@ -83,6 +83,16 @@ class Result(Model):
     updated_at = fields.DatetimeField(auto_now=True)
     deleted_at = fields.DatetimeField(null=True)
 
+    call_purpose = fields.TextField()
+    reason_for_conversation_sentiment = fields.TextField()
+    reason_for_operator_sentiment = fields.TextField()
+    list_of_words_define_operator_sentiment = fields.TextField()
+    reason_for_customer_sentiment = fields.TextField()
+    list_of_words_define_customer_sentiment = fields.TextField()
+    reason_for_customer_purchase = fields.TextField()
+    how_old_is_customer = fields.CharField(max_length=32)
+    which_platform_customer_found_about_the_course =  fields.CharField(max_length=32)
+
 
 class OperatorData(Model):
     id = fields.UUIDField(pk=True, default=uuid.uuid4)
