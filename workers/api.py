@@ -20,7 +20,7 @@ from utils.data_manipulation import (
 import backend.db as db
 from utils.mohirai import mohirAI
 
-checklist_prompt_with_segment = """
+checklist_prompt = """
     You are given a conversation between a call center operator and a potential customer. 
     The operator should ask certain questions from the list below, organized by segments. 
     Your task is to identify if each question is asked or not within each segment. 
