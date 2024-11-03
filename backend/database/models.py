@@ -11,8 +11,8 @@ class Account(Model):
     password = fields.CharField(max_length=255)
     role = fields.CharField(max_length=255)
     company_name = fields.CharField(max_length=255)
-    created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
 
     class PydanticMeta:
         exclude = ("password",)
@@ -92,6 +92,9 @@ class OperatorData(Model):
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
     deleted_at = fields.DatetimeField(null=True)
+
+    class Meta:
+        table = "operator_data"
 
 
 class BlackListToken(Model):

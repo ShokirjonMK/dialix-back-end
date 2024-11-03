@@ -80,6 +80,9 @@ async def get_current_user_websocket(token: str):
 async def authenticate_user(username: str, password: str):
     account = await Account.filter(username=username).first()
 
+    if account is None:
+        return
+
     password_matches: bool = bcrypt.checkpw(
         password=password.encode("utf-8"),
         hashed_password=account.password.encode("utf-8"),

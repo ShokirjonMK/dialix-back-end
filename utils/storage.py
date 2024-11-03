@@ -1,9 +1,9 @@
+import re
+import os
 import datetime
 import logging
-import os
-import re
+from decouple import config
 
-from fastapi import HTTPException
 from filelock import FileLock
 from google.cloud import storage
 from utils.redis_utils import cache
@@ -54,7 +54,9 @@ def exists(bucket, remote_path):
 
 def file_exists(file_id):
     client = get_client()
-    bucket = client.get_bucket(os.getenv("STORAGE_BUCKET_NAME", "dialixai-production"))
+    bucket = client.get_bucket(
+        config("STORAGE_BUCKET_NAME", default="dialixai-production")
+    )
     blob: storage.blob.Blob = bucket.blob(file_id)
     return blob.exists()
 
@@ -76,13 +78,15 @@ def upload_file(bucket, remote_path, local_path):
 
 def delete_file(file_id):
     client = get_client()
-    bucket = client.get_bucket(os.getenv("STORAGE_BUCKET_NAME", "dialixai-production"))
+    bucket = client.get_bucket(
+        config("STORAGE_BUCKET_NAME", default="dialixai-production")
+    )
     blob: storage.blob.Blob = bucket.blob(file_id)
     blob.delete()
 
 
 def _get_stream_url(
-    file_id, bucket=os.getenv("STORAGE_BUCKET_NAME", "dialixai-production")
+    file_id, bucket=config("STORAGE_BUCKET_NAME", default="dialixai-production")
 ):
     client = get_client()
     bucket = client.get_bucket(bucket)
@@ -97,13 +101,15 @@ def _get_stream_url(
 
 
 get_stream_url = cache.cache(
-    ttl=60 * 60 * 24, limit=0, namespace=os.getenv("STORAGE_REDIS_KEY", "storage")
+    ttl=60 * 60 * 24, limit=0, namespace=config("STORAGE_REDIS_KEY", default="storage")
 )(_get_stream_url)
 
 
 def get_upload_url(file_id, content_type="video/mp4"):
     client = get_client()
-    bucket = client.get_bucket(os.getenv("STORAGE_BUCKET_NAME", "dialixai-production"))
+    bucket = client.get_bucket(
+        config("STORAGE_BUCKET_NAME", default="dialixai-production")
+    )
     blob: storage.blob.Blob = bucket.blob(file_id)
     url = blob.generate_signed_url(
         expiration=datetime.timedelta(minutes=60 * 24),

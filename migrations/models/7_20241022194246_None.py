@@ -10,8 +10,12 @@ async def upgrade(db: BaseDBAsyncClient) -> str:
     "password" VARCHAR(255) NOT NULL,
     "role" VARCHAR(255) NOT NULL,
     "company_name" VARCHAR(255) NOT NULL,
-    "created_at" TIMESTAMPTZ NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ NOT NULL  DEFAULT CURRENT_TIMESTAMP
+    "updated_at" TIMESTAMPTZ NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMPTZ NOT NULL  DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS "blacklisttoken" (
+    "id" SERIAL NOT NULL PRIMARY KEY,
+    "value" TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS "checklist" (
     "id" UUID NOT NULL  PRIMARY KEY,
@@ -23,7 +27,7 @@ CREATE TABLE IF NOT EXISTS "checklist" (
     "deleted_at" TIMESTAMPTZ,
     "owner_id" UUID NOT NULL REFERENCES "account" ("id") ON DELETE CASCADE
 );
-CREATE TABLE IF NOT EXISTS "operatordata" (
+CREATE TABLE IF NOT EXISTS "operator_data" (
     "id" UUID NOT NULL  PRIMARY KEY,
     "code" INT NOT NULL,
     "name" VARCHAR(255) NOT NULL,

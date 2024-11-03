@@ -1,11 +1,13 @@
-import datetime
-import logging
-import os
 import uuid
+import logging
+import datetime
+
+from decouple import config
+
 import psycopg2
-from psycopg2.extras import DictCursor
-from psycopg2.extensions import register_adapter
+import psycopg2.extras
 from psycopg2.pool import SimpleConnectionPool
+from psycopg2.extensions import register_adapter
 
 pool: SimpleConnectionPool = None
 
@@ -20,7 +22,7 @@ register_adapter(uuid.UUID, adapt_uuid)
 def get_pool():
     global pool
     if pool is None:
-        dsn = os.getenv("DATABASE_URL")
+        dsn = config("DATABASE_URL")
         pool = SimpleConnectionPool(minconn=1, maxconn=10, dsn=dsn)
     return pool
 
@@ -74,9 +76,9 @@ def migrate_up():
             cursor.execute("SELECT * FROM migrations")
             existing_migrations = cursor.fetchall()
             connection.commit()
-        except:
+        except Exception as exc:
             connection.rollback()
-            print('Creating "migrations" table...')
+            print(f'Creating "migrations" table... {exc=}')
             cursor.execute(
                 "CREATE TABLE migrations (id varchar PRIMARY KEY, created_at timestamp NOT NULL)"
             )
@@ -241,10 +243,26 @@ def remove_record(connection, record_id: str, owner_id: str):
 
 
 @db_connection_wrapper
-def get_records(connection, owner_id: str):
+def get_records_v1(connection, owner_id: str):
     return select_many(
         connection,
         "SELECT * FROM record WHERE owner_id = %s",
+        (owner_id,),
+    )
+
+
+@db_connection_wrapper
+def get_records_v2(connection, owner_id: str):
+    """Optimized version of previous one (line: 246)
+    Difference: it will only select conversation_text from payload::json
+    """
+    return select_many(
+        connection,
+        "select"
+        " id, owner_id, title, duration, operator_code, operator_name,"
+        " call_type, source, status, storage_id, created_at, updated_at,"
+        " deleted_at, payload#>'{result,conversation_text}' as conversation_text"
+        " from record where owner_id = %s",
         (owner_id,),
     )
 
@@ -269,32 +287,26 @@ def get_pending_audios(connection, owner_id: str):
 
 
 @db_connection_wrapper
-def get_count_of_records(connection, owner_id: str):
-    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        cursor.execute(
-            "SELECT COUNT(*) FROM record WHERE owner_id = %s",
-            (owner_id,),
-        )
-        return dict(cursor.fetchone())
-
-
-@db_connection_wrapper
 def upsert_checklist(connection, checklist: dict):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        keys = [
-            key for key in checklist.keys() if key not in ["created_at", "updated_at"]
-        ]
+        keys = [key for key in checklist if key not in ["created_at", "updated_at"]]
         id = checklist["id"]
 
         cursor.execute(
-            f"INSERT INTO checklist ({', '.join(keys)}) VALUES ({', '.join(['%s'] * len(keys))}) ON CONFLICT (id) DO UPDATE SET {', '.join([f'{key} = %s' for key in keys])}, updated_at = NOW() WHERE checklist.id = %s RETURNING *",
+            f"""
+            INSERT INTO checklist ({', '.join(keys)}) 
+            VALUES ({', '.join(['%s'] * len(keys))}) 
+            ON CONFLICT (id) DO UPDATE 
+            SET {', '.join([f'{key} = %s' for key in keys])}, 
+                updated_at = NOW() 
+            WHERE checklist.id = %s 
+            RETURNING *
+            """,
             tuple(
                 [
-                    (
-                        psycopg2.extras.Json(checklist[key])
-                        if key == "payload" and isinstance(checklist[key], dict)
-                        else checklist[key]
-                    )
+                    psycopg2.extras.Json(checklist[key])
+                    if key == "payload"
+                    else checklist[key]
                     for key in keys
                 ]
             )
@@ -303,6 +315,26 @@ def upsert_checklist(connection, checklist: dict):
         )
 
         return dict(cursor.fetchone())
+
+
+@db_connection_wrapper
+def update_checklist(connection, checklist_id: str, update_data: dict):
+    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+        keys = [f"{key} = %s" for key in update_data]
+        values = list(update_data.values())
+
+        cursor.execute(
+            f"""
+            UPDATE checklist 
+            SET {', '.join(keys)}, updated_at = NOW() 
+            WHERE id = %s 
+            RETURNING *
+            """,
+            values + [checklist_id],
+        )
+
+        updated_checklist = cursor.fetchone()
+        return dict(updated_checklist) if updated_checklist else None
 
 
 @db_connection_wrapper
@@ -366,6 +398,8 @@ def upsert_result(
     connection,
     result: dict,
 ):
+    logging.info(f"Inserting result data: {result=}")
+
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         keys = [key for key in result.keys() if key not in ["created_at", "updated_at"]]
         id = result["id"]

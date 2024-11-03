@@ -41,12 +41,14 @@ deploy_image_prod:
     - echo "$GITLAB_PRIVATE_KEY" > ~/.ssh/id_rsa
     - echo "$CI_REGISTRY"
   script: |
+      SERVER_IP="35.246.192.46"
+
       [[ $CI_COMMIT_REF_NAME = 'main' ]] && SERVICE_POSTFIX="" || SERVICE_POSTFIX="-dev"
       [[ $CI_COMMIT_REF_NAME = 'main' ]] && IMAGE_TAG="$CI_PIPELINE_IID" || IMAGE_TAG="$CI_PIPELINE_IID-dev"
 
-      ssh -o StrictHostKeyChecking=no -tt root@35.246.192.46 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$IMAGE_TAG\\\" \\\\' /etc/systemd/system/docker-web$SERVICE_POSTFIX.service && systemctl daemon-reload && systemctl restart docker-web$SERVICE_POSTFIX"
-      ssh -o StrictHostKeyChecking=no -tt root@35.246.192.46 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$IMAGE_TAG\\\" \\\\'   /etc/systemd/system/docker-api-worker$SERVICE_POSTFIX.service && systemctl daemon-reload && systemctl restart docker-api-worker$SERVICE_POSTFIX"
-      ssh -o StrictHostKeyChecking=no -tt root@35.246.192.46 "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$IMAGE_TAG\\\" \\\\' /etc/systemd/system/docker-data-worker$SERVICE_POSTFIX.service && systemctl daemon-reload && systemctl restart docker-data-worker$SERVICE_POSTFIX"
+      ssh -o StrictHostKeyChecking=no -tt root@$SERVER_IP "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$IMAGE_TAG\\\" \\\\' /etc/systemd/system/docker-web$SERVICE_POSTFIX.service && systemctl daemon-reload && systemctl restart docker-web$SERVICE_POSTFIX"
+      ssh -o StrictHostKeyChecking=no -tt root@$SERVER_IP "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$IMAGE_TAG\\\" \\\\'   /etc/systemd/system/docker-api-worker$SERVICE_POSTFIX.service && systemctl daemon-reload && systemctl restart docker-api-worker$SERVICE_POSTFIX"
+      ssh -o StrictHostKeyChecking=no -tt root@$SERVER_IP "sed -i '/registry.gitlab.com/c\\\"$CI_REGISTRY/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$IMAGE_TAG\\\" \\\\' /etc/systemd/system/docker-data-worker$SERVICE_POSTFIX.service && systemctl daemon-reload && systemctl restart docker-data-worker$SERVICE_POSTFIX"
   only:
     - main
     - dev

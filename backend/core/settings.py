@@ -39,6 +39,8 @@ TORTOISE_CONFIG: dict[str, t.Any] = {
             "default_connection": "default",
         }
     },
+    "use_tz": False,
+    "timezone": "UTC",
 }
 
 ###
@@ -51,6 +53,8 @@ SECRET_KEY: str = config("AUTH_SECRET_KEY")
 ###
 # Other
 ##
+
+PBX_API_URL = "https://api.onlinepbx.ru/{domain}"
 
 # api.py is slowing down startup process.
 # currently, I may not need this module

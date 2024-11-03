@@ -1,27 +1,36 @@
-import json
-import logging
-import math
 import os
 import uuid
+import math
 import shutil
-import backend.db as db
-from typing import List, Tuple, Union
-from fastapi import Depends, UploadFile, Request, HTTPException, APIRouter
+import logging
+from decouple import config
+from datetime import datetime, timedelta
+from typing import List, Tuple, Union, Optional
+
+from celery.result import AsyncResult
+
 from fastapi.responses import JSONResponse
-from utils.data_manipulation import find_operator_code, find_call_type
+from fastapi import Depends, UploadFile, Request, HTTPException, APIRouter, status
+
+from backend import db
+from backend.core.auth import get_current_user
+from backend.schemas import User, ReprocessRecord, OperatorData
+
 from utils.storage import get_stream_url, upload_file
 from utils.audio import get_audio_duration
 from utils.encoder import adapt_json
-from workers.api import api_processing
-from backend.core.auth import get_current_user
-from backend.schemas import User, ReprocessRecord, OperatorData
-from celery.result import AsyncResult
-from workers.data import upsert_data
+from utils.data_manipulation import find_operator_code, find_call_type
 
-from datetime import datetime, timedelta
+from workers.api import api_processing
+from workers.data import upsert_data
 
 
 api_router = APIRouter()
+
+PBX_URL = "https://api.onlinepbx.ru/{domain}"
+
+MAX_FILE_SIZE_MB = 15
+SUPPORTED_FORMATS = [".mp3", ".wav", ".aac"]
 
 
 def get_task_id(user_id):
@@ -169,7 +178,7 @@ async def process_form_data(request: Request):
 
 @api_router.get("/audios_results")
 async def get_audio_and_results(current_user: User = Depends(get_current_user)):
-    recordings = db.get_records(owner_id=str(current_user.id))
+    recordings = db.get_records_v1(owner_id=str(current_user.id))
     recordings = adapt_json(recordings)
     just_audios = []
     audios_with_checklist = []
@@ -180,6 +189,7 @@ async def get_audio_and_results(current_user: User = Depends(get_current_user)):
         result = db.get_result_by_record_id(record["id"], owner_id=str(current_user.id))
         audio_url = get_stream_url(f"{folder_name}/{record['storage_id']}")
         record["audio_url"] = audio_url
+
         if result:
             summary = result.get("summary", None)
             checklist_result = result.get("checklist_result", None)
@@ -206,6 +216,41 @@ async def get_audio_and_results(current_user: User = Depends(get_current_user)):
     return JSONResponse(status_code=200, content=response)
 
 
+@api_router.get("/v2/audios_results")
+async def get_audio_and_results_v2(current_user: User = Depends(get_current_user)):
+    recordings = db.get_records_v2(
+        owner_id=str(current_user.id)
+    )  # use v1 if you wanna offset stuff.
+
+    recordings = adapt_json(recordings)
+
+    folder_name = current_user.company_name.lower().replace(" ", "_")
+
+    for record in recordings:
+        result = db.get_result_by_record_id(record["id"], owner_id=str(current_user.id))
+        audio_url = get_stream_url(f"{folder_name}/{record['storage_id']}")
+
+        record["audio_url"] = audio_url
+
+        if not result:
+            record["type"] = "just_audio"
+            record["result"] = None
+        else:
+            summary_exists: bool = result.get("summary") is not None
+            checklist_result_exists: bool = result.get("checklist_result") is not None
+
+            if summary_exists and checklist_result_exists:
+                record["type"] = "full_audio"
+            elif checklist_result_exists:
+                record["type"] = "audio_with_checklist"
+            else:
+                record["type"] = "general_audio"
+
+            record["result"] = adapt_json(result)
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content=recordings)
+
+
 @api_router.get("/audio/file/{storage_id}")
 async def get_audio_file(request: Request, storage_id: str):
     # return url to audio file
@@ -217,52 +262,23 @@ async def get_audio_file(request: Request, storage_id: str):
     # return FileResponse(f"uploads/{storage_id}")
 
 
-@api_router.get("/audios_results")
-async def get_audio_and_results(current_user: User = Depends(get_current_user)):
-    recordings = db.get_records(owner_id=str(current_user.id))
-    recordings = adapt_json(recordings)
-    logging.warning(json.dumps(f"Recordings: {recordings}", indent=2))
-    just_audios = []
-    audios_with_checklist = []
-    general_audios = []
-    full_audios = []
-    for record in recordings:
-        result = db.get_result_by_record_id(record["id"], owner_id=str(current_user.id))
-        if result:
-            summary = result.get("summary", None)
-            checklist_results = result.get("checklist_results", None)
-            if summary and checklist_results:
-                record["result"] = adapt_json(result)
-                full_audios.append(record)
-            elif checklist_results:
-                record["result"] = adapt_json(result)
-                audios_with_checklist.append(record)
-            else:
-                record["result"] = adapt_json(result)
-                general_audios.append(record)
-        else:
-            record["result"] = None
-            just_audios.append(record)
-    response = {
-        "just_audios": just_audios,
-        "audios_with_checklist": audios_with_checklist,
-        "general_audios": general_audios,
-        "full_audios": full_audios,
-        "recordings": recordings,
-    }
-
-    return JSONResponse(status_code=200, content=response)
-
-
 @api_router.post("/audio", dependencies=[Depends(get_current_user)])
 async def analyze_data(
     processed_data: Tuple[
         List[UploadFile], List[bool], List[Union[str, None]], List[dict]
     ] = Depends(process_form_data),
     current_user: User = Depends(get_current_user),
+    _operator_code: Optional[str] = None,  # for now, internal use only
+    _call_type: Optional[str] = None,
 ):
     responses = []
+
     files, general, checklist_id, processed_files = processed_data
+
+    logging.info(
+        f"Received request: {files=} {general=} {checklist_id=} {processed_files=}"
+    )
+
     for file, general, checklist_id, processed_file in zip(
         files, general, checklist_id, processed_files
     ):
@@ -272,7 +288,7 @@ async def analyze_data(
         storage_id = processed_file["file_path"].split("/")[-1]
         file_path = processed_file["file_path"]
         duration = processed_file["duration"]
-        bucket = os.getenv("STORAGE_BUCKET_NAME", "dialixai-production")
+        bucket = config("STORAGE_BUCKET_NAME", default="dialixai-production")
 
         folder_name = current_user.company_name.lower().replace(" ", "_")
 
@@ -281,8 +297,11 @@ async def analyze_data(
             f"folder_name: {folder_name} storage_id: {storage_id}, bucket: {bucket}"
         )
         task_id = get_task_id(user_id=current_user.id)
-        operator_code = find_operator_code(file.filename)
-        call_type = find_call_type(file.filename)
+        operator_code = _operator_code or find_operator_code(file.filename)
+        call_type = _call_type or find_call_type(file.filename)
+
+        logging.info(f"{_operator_code=} {_call_type=} {operator_code=} {call_type=}")
+
         operator = (
             db.get_operator_name_by_code(owner_id=owner_id, code=operator_code) or {}
         )
@@ -308,10 +327,8 @@ async def analyze_data(
             f"Audio record: {audio_record} with id: {record_id} and owner_id: {current_user.id}"
         )
 
-        audio_local_path = f"uploads/transcode_{storage_id}.mp3"
-
-        waveform_local_path = f"uploads/transcode_waveform_{storage_id}.dat"
-
+        # audio_local_path = f"uploads/transcode_{storage_id}.mp3"
+        # waveform_local_path = f"uploads/transcode_waveform_{storage_id}.dat"
         # generate_waveform(audio_local_path, waveform_local_path)
 
         if general is False and checklist_id is None:

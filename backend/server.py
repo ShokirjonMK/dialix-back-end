@@ -15,6 +15,7 @@ from backend.core.lifespan import lifespan_handler
 from backend.core.logging import configure_logging
 from backend.core.exceptions import register_exception_handlers
 
+from backend.routers.pbx import pbx_router
 from backend.routers.user import user_router
 from backend.routers.checklist import checklist_router
 
@@ -33,7 +34,7 @@ application.mount("/ws/", app=sio_app)
 ###
 # Setup Routers
 ###
-ROUTERS = [user_router, checklist_router]
+ROUTERS = [user_router, checklist_router, pbx_router]
 
 if settings.ENABLE_CORE_API_MODULE:
     from backend.api import api_router
@@ -61,7 +62,7 @@ application.add_middleware(CORSMiddleware, **settings.CORS_SETTINGS)
 
 
 @application.get("/health")
-async def health():
+async def healthcheck():
     connection = connections.get("default")
     db_version_record: None = None
 
