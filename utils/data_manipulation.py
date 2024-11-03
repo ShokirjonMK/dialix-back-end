@@ -1,6 +1,6 @@
-import logging
-import json
 import re
+import json
+import logging
 
 
 def extract_specific_part(input_str):
@@ -17,6 +17,8 @@ def extract_specific_part(input_str):
 
 
 def convert_string_to_json(input_str):
+    logging.info(f"Converting string to json: {input_str=}")
+
     try:
         json_data = json.loads(input_str)
         return json_data
@@ -153,7 +155,7 @@ def find_position_from_filename(file_path):
             return 0, 1
         else:
             return 1, 0
-    except Exception as e:
+    except Exception:
         return 0, 1
 
 
