@@ -71,7 +71,7 @@ general_prompt = """
     Here is a conversation between a customer and an operator. The customer is interested in buying an online IT course. The operator is trying to sell the course to the customer. The conversation is in Uzbek language. According to the conversation, answer the following questions and return in json format with the following:
     Response format: {
     "is_conversation_over": true or false,
-    "call_purpose": "Choose from: Ma'lumot olish, Pulni Qaytarish, Kurs sotib olish, Texnik muammo, To'lov masalasi, Dars sifati",
+    "call_purpose": "Clients call for a specific purpose. Sometimes, their purpose could be purchasing the product. Choose only one. Because each call has only one purpose. Clients call for the following purposes: Ma'lumot olish, Pulni Qaytarish, Kurs sotib olish, Texnik muammo, To'lov masalasi, Dars sifati",
     "sentiment_analysis_of_conversation": "positive" or "negative" or "neutral",
     "reason_for_conversation_sentiment": "Detailed explanation in Uzbek within 30 words. Provide clear improvement steps if negative sentiment.",
     "sentiment_analysis_of_operator": "positive" or "negative" or "neutral",
