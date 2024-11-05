@@ -116,7 +116,7 @@ def general_checker(text, general_prompt, courses_list, checklist=None):
                 },
                 {"role": "user", "content": text},
             ],
-            temprature = 0.2
+            temperature = 0.2
         )
 
         # Assuming the response structure has the corrected text in a specific field
