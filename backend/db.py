@@ -1,5 +1,14 @@
+"""
+SQL injection alert ...
+We/You/I need to move ORM stuff asap. Otherwise there will be big mess.
+Raw sql queries are not gonna work...
+
+@Abduaziz
+"""
+
 import uuid
 import logging
+import typing as t
 
 import psycopg2
 import psycopg2.extras
@@ -106,12 +115,12 @@ def remove_record(connection, record_id: str, owner_id: str):
 
 
 @db_connection_wrapper
-def get_records_v1(connection, owner_id: str):
-    return select_many(
-        connection,
-        "SELECT * FROM record WHERE owner_id = %s",
-        (owner_id,),
-    )
+def get_records_v1(connection, owner_id: str, filter_params: t.Optional[dict] = {}):
+    filter_clause: str = build_audio_result_filter_predicate(filter_params)
+    sql_query: str = "SELECT * FROM record WHERE owner_id = %s and " + filter_clause
+    logging.info(f"Sql query for get_records: {sql_query=}")
+
+    return select_many(connection, sql_query, (owner_id,))
 
 
 @db_connection_wrapper
@@ -129,6 +138,37 @@ def get_records_v2(connection, owner_id: str):
         "from record where owner_id = %s",
         (owner_id,),
     )
+
+
+def build_audio_result_filter_predicate(
+    filter_options: dict[
+        str, t.Union[str, int, bool]
+    ],  # why not kwargs? A: field name can be like this 'field->val'
+) -> str:
+    predicate: list[str] = ["1=1"]
+
+    for field, value in filter_options.items():
+        if value is None:
+            continue
+
+        operator, formatted_value = None, None
+
+        # in this case, if-else better than ternary stuff ...
+
+        if isinstance(value, str):
+            formatted_value: str = f"'{value}'"
+            operator = "ilike"
+        else:
+            formatted_value: str = str(value)
+            if isinstance(value, bool):
+                formatted_value = formatted_value.lower()
+            operator = "="
+
+        # yes, I know f-strings, even t-strings also
+        predicate.append("%s %s %s" % (field, operator, formatted_value))
+
+    predicate_str: str = " and ".join(predicate)
+    return predicate_str + ";"
 
 
 @db_connection_wrapper
@@ -297,12 +337,18 @@ def get_result_by_id(connection, result_id: str, owner_id: str):
 
 
 @db_connection_wrapper
-def get_result_by_record_id(connection, record_id: str, owner_id: str):
-    return select_one(
-        connection,
-        "SELECT * FROM result WHERE record_id = %s AND owner_id = %s",
-        (record_id, owner_id),
+def get_result_by_record_id(
+    connection, record_id: str, owner_id: str, filter_params: t.Optional[dict] = {}
+):
+    filter_clause: str = build_audio_result_filter_predicate(filter_params)
+
+    sql_query = (
+        "SELECT * FROM result WHERE record_id = %s AND owner_id = %s and "
+        + filter_clause
     )
+    logging.info(f"Sql query for get_result_by_record_id: {sql_query=}")
+
+    return select_one(connection, sql_query, (record_id, owner_id))
 
 
 @db_connection_wrapper

@@ -3,6 +3,7 @@ import uuid
 import math
 import shutil
 import logging
+import typing as t  # noqa: F401
 from decouple import config
 from datetime import datetime, timedelta
 from typing import List, Tuple, Union, Optional
@@ -14,7 +15,13 @@ from fastapi import Depends, UploadFile, Request, HTTPException, APIRouter, stat
 
 from backend import db
 from backend.core.auth import get_current_user
-from backend.schemas import User, ReprocessRecord, OperatorData
+from backend.schemas import (
+    User,
+    ReprocessRecord,
+    OperatorData,
+    RecordQueryParams,
+    ResultQueryParams,
+)
 
 from utils.storage import get_stream_url, upload_file
 from utils.audio import get_audio_duration
@@ -182,17 +189,37 @@ async def process_form_data(request: Request):
 
 
 @api_router.get("/audios_results")
-async def get_audio_and_results(current_user: User = Depends(get_current_user)):
-    recordings = db.get_records_v1(owner_id=str(current_user.id))
+async def get_audio_and_results(
+    current_user: User = Depends(get_current_user),
+    record_query_params: RecordQueryParams = Depends(),
+    result_query_params: ResultQueryParams = Depends(),
+):
+    record_filter_params = record_query_params.model_dump(
+        mode="python", exclude_none=True
+    )
+    result_filter_params = result_query_params.model_dump(
+        mode="python", exclude_none=True
+    )
+    logging.info(f"{record_filter_params=} {result_filter_params=}")
+    
+    recordings = db.get_records_v1(
+        owner_id=str(current_user.id), filter_params=record_filter_params
+    )
     recordings = adapt_json(recordings)
-    just_audios = []
-    audios_with_checklist = []
-    general_audios = []
+
     full_audios = []
+    just_audios = []
+    general_audios = []
+    audios_with_checklist = []
+
     folder_name = current_user.company_name.lower().replace(" ", "_")
 
     for record in recordings:
-        result = db.get_result_by_record_id(record["id"], owner_id=str(current_user.id))
+        result = db.get_result_by_record_id(
+            record["id"],
+            owner_id=str(current_user.id),
+            filter_params=result_filter_params,
+        )
         audio_url = get_stream_url(f"{folder_name}/{record['storage_id']}")
         record["audio_url"] = audio_url
 
