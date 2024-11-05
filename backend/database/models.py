@@ -3,6 +3,8 @@ import uuid
 from tortoise import fields
 from tortoise.models import Model
 
+fields.DatetimeField._db_postgres.SQL_TYPE = "TIMESTAMP"
+
 
 class Account(Model):
     id = fields.UUIDField(pk=True, default=uuid.uuid4)
