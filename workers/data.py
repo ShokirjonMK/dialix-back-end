@@ -78,7 +78,11 @@ def upsert_data(self: PredictTask, *args, **kwargs):
         db.upsert_record(record={**existing_record, "status": "COMPLETED"})
 
         if isinstance(checklist_response, str):
-            logging.info(f"{checklist_response.strip("`").strip("json").strip("\n")=}")
+            logging.info(
+                "Checklist response: {}".format(
+                    checklist_response.strip("`").strip("json").strip("\n")
+                )
+            )
             checklist_response = json.loads(
                 checklist_response.strip("`").strip("json").strip("\n")
             )
