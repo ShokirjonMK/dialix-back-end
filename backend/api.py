@@ -3,6 +3,7 @@ import uuid
 import math
 import shutil
 import logging
+import typing as t  # noqa: F401
 from decouple import config
 from datetime import datetime, timedelta
 from typing import List, Tuple, Union, Optional
@@ -14,7 +15,13 @@ from fastapi import Depends, UploadFile, Request, HTTPException, APIRouter, stat
 
 from backend import db
 from backend.core.auth import get_current_user
-from backend.schemas import User, ReprocessRecord, OperatorData
+from backend.schemas import (
+    User,
+    ReprocessRecord,
+    OperatorData,
+    RecordQueryParams,
+    ResultQueryParams,
+)
 
 from utils.storage import get_stream_url, upload_file
 from utils.audio import get_audio_duration
@@ -26,11 +33,6 @@ from workers.data import upsert_data
 
 
 api_router = APIRouter()
-
-PBX_URL = "https://api.onlinepbx.ru/{domain}"
-
-MAX_FILE_SIZE_MB = 15
-SUPPORTED_FORMATS = [".mp3", ".wav", ".aac"]
 
 
 def get_task_id(user_id):
@@ -126,6 +128,7 @@ async def process_form_data(request: Request):
     form = await request.form()
     current_user = await get_current_user(request)
     files = form.getlist("files")
+    logging.info(f"{files=}")
     general = [gen == "true" for gen in form.getlist("general")]
     checklist_id = [chk if chk else None for chk in form.getlist("checklist_id")]
     balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0)
@@ -146,7 +149,8 @@ async def process_form_data(request: Request):
             if os.path.exists(file_path):
                 os.remove(file_path)
             return JSONResponse(
-                status_code=400, content={"error": "Invalid audio file"}
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": "Invalid audio file"},
             )
 
         processed_files.append(
@@ -165,28 +169,57 @@ async def process_form_data(request: Request):
         )
         total_price += mohirai_price + general_price + checklist_price
 
+    logging.info(f"Process form data: {total_price=} {balance=}")
+
     if total_price > balance:
         for file in processed_files:
             if os.path.exists(file["file_path"]):
                 os.remove(file["file_path"])
-        raise HTTPException(status_code=400, detail="Not enough balance")
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Not enough balance"
+        )
 
     if len(files) != len(general) or len(files) != len(checklist_id):
-        raise HTTPException(status_code=400, detail="Mismatched lengths of arrays.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Mismatched lengths of arrays.",
+        )
+
     return files, general, checklist_id, processed_files
 
 
 @api_router.get("/audios_results")
-async def get_audio_and_results(current_user: User = Depends(get_current_user)):
-    recordings = db.get_records_v1(owner_id=str(current_user.id))
+async def get_audio_and_results(
+    current_user: User = Depends(get_current_user),
+    record_query_params: RecordQueryParams = Depends(),
+    result_query_params: ResultQueryParams = Depends(),
+):
+    record_filter_params = record_query_params.model_dump(
+        mode="python", exclude_none=True
+    )
+    result_filter_params = result_query_params.model_dump(
+        mode="python", exclude_none=True
+    )
+    logging.info(f"{record_filter_params=} {result_filter_params=}")
+    
+    recordings = db.get_records_v1(
+        owner_id=str(current_user.id), filter_params=record_filter_params
+    )
     recordings = adapt_json(recordings)
-    just_audios = []
-    audios_with_checklist = []
-    general_audios = []
+
     full_audios = []
+    just_audios = []
+    general_audios = []
+    audios_with_checklist = []
+
     folder_name = current_user.company_name.lower().replace(" ", "_")
+
     for record in recordings:
-        result = db.get_result_by_record_id(record["id"], owner_id=str(current_user.id))
+        result = db.get_result_by_record_id(
+            record["id"],
+            owner_id=str(current_user.id),
+            filter_params=result_filter_params,
+        )
         audio_url = get_stream_url(f"{folder_name}/{record['storage_id']}")
         record["audio_url"] = audio_url
 
@@ -205,6 +238,7 @@ async def get_audio_and_results(current_user: User = Depends(get_current_user)):
         else:
             record["result"] = None
             just_audios.append(record)
+
     response = {
         "just_audios": just_audios,
         "audios_with_checklist": audios_with_checklist,
@@ -213,17 +247,14 @@ async def get_audio_and_results(current_user: User = Depends(get_current_user)):
         "recordings": recordings,
     }
 
-    return JSONResponse(status_code=200, content=response)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=response)
 
 
 @api_router.get("/v2/audios_results")
 async def get_audio_and_results_v2(current_user: User = Depends(get_current_user)):
-    recordings = db.get_records_v2(
-        owner_id=str(current_user.id)
-    )  # use v1 if you wanna offset stuff.
+    recordings = db.get_records_v2(owner_id=str(current_user.id))
 
     recordings = adapt_json(recordings)
-
     folder_name = current_user.company_name.lower().replace(" ", "_")
 
     for record in recordings:
@@ -255,10 +286,10 @@ async def get_audio_and_results_v2(current_user: User = Depends(get_current_user
 async def get_audio_file(request: Request, storage_id: str):
     # return url to audio file
     return JSONResponse(
-        status_code=200,
+        status_code=status.HTTP_200_OK,
         content={"url": f"{request.base_url}uploads/{storage_id}"},
     )
-    # return file itself
+    # or file itself
     # return FileResponse(f"uploads/{storage_id}")
 
 
@@ -293,7 +324,7 @@ async def analyze_data(
         folder_name = current_user.company_name.lower().replace(" ", "_")
 
         upload_file(bucket, f"{folder_name}/{storage_id}", file_path)
-        logging.warning(
+        logging.info(
             f"folder_name: {folder_name} storage_id: {storage_id}, bucket: {bucket}"
         )
         task_id = get_task_id(user_id=current_user.id)

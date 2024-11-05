@@ -1,152 +1,26 @@
+"""
+SQL injection alert ...
+We/You/I need to move ORM stuff asap. Otherwise there will be big mess.
+Raw sql queries are not gonna work...
+
+@Abduaziz
+"""
+
 import uuid
 import logging
-import datetime
-
-from decouple import config
+import typing as t
 
 import psycopg2
 import psycopg2.extras
-from psycopg2.pool import SimpleConnectionPool
-from psycopg2.extensions import register_adapter
+from psycopg2.extensions import register_adapter, connection as Connection
 
-pool: SimpleConnectionPool = None
+from backend.database.utils import db_connection_wrapper, select_many, select_one
 
+register_adapter(uuid.UUID, lambda _uuid: psycopg2.extensions.AsIs(str(uuid)))
 
-def adapt_uuid(uuid):
-    return psycopg2.extensions.AsIs(str(uuid))
-
-
-register_adapter(uuid.UUID, adapt_uuid)
-
-
-def get_pool():
-    global pool
-    if pool is None:
-        dsn = config("DATABASE_URL")
-        pool = SimpleConnectionPool(minconn=1, maxconn=10, dsn=dsn)
-    return pool
-
-
-class ConnectionWrapper:
-    def __enter__(self):
-        self.pool = get_pool()
-        self.connection = self.pool.getconn()
-        return self.connection
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.pool.putconn(self.connection)
-
-
-# Decorator to handle database connections
-def db_connection_wrapper(func):
-    def wrapper(*args, **kwargs):
-        start_time = datetime.datetime.now()
-        with ConnectionWrapper() as connection:
-            exception = None
-            try:
-                return func(connection, *args, **kwargs)
-            except Exception as e:
-                exception = e
-                raise e
-            finally:
-                if datetime.datetime.now() - start_time > datetime.timedelta(
-                    seconds=0.5
-                ):
-                    logging.info(
-                        f"Slow query: {func.__name__} took {datetime.datetime.now() - start_time}"
-                    )
-                if exception:
-                    connection.rollback()
-                else:
-                    connection.commit()
-
-    wrapper.__name__ = func.__name__
-    return wrapper
-
-
-def migrate_up():
-    with ConnectionWrapper() as connection:
-        import os
-
-        os.makedirs("./migrations", exist_ok=True)
-        existing_migrations = []
-        cursor = connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
-        try:
-            cursor.execute("SELECT * FROM migrations")
-            existing_migrations = cursor.fetchall()
-            connection.commit()
-        except Exception as exc:
-            connection.rollback()
-            print(f'Creating "migrations" table... {exc=}')
-            cursor.execute(
-                "CREATE TABLE migrations (id varchar PRIMARY KEY, created_at timestamp NOT NULL)"
-            )
-            pass
-
-        migration_files = os.listdir("./migrations")
-        migration_files = [
-            file
-            for file in migration_files
-            if file.endswith(".py") and "__pycach" not in file
-        ]
-        existing_migration_ids = set(
-            [migration["id"] for migration in existing_migrations]
-        )
-        migration_files = [
-            file for file in migration_files if file not in existing_migration_ids
-        ]
-        migration_files.sort()
-        print(
-            f"Found {len(migration_files)} migration files, running..."
-            if len(migration_files) > 0
-            else "No migration files found, skipping..."
-        )
-        for migration_file in migration_files:
-            try:
-                print(f"Running migration {migration_file}")
-                # import migration file
-                migration = __import__(
-                    f"migrations.{migration_file[:-3]}", fromlist=["up"]
-                )
-
-                # run migration
-                migration.up(cursor)
-                query = "INSERT INTO migrations (id, created_at) VALUES (%s, %s)"
-                cursor.execute(
-                    query,
-                    (
-                        migration_file,
-                        datetime.datetime.now(),
-                    ),
-                )
-                connection.commit()
-            except Exception as e:
-                print(f"Error running migration {migration_file}: {e}")
-                print("Stacktrace:")
-                import traceback
-
-                traceback.print_exc()
-                exit(1)
-
-
-def select_one(connection, query, params=None) -> dict:
-    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        cursor.execute(query, params)
-        result = cursor.fetchone()
-        return dict(result) if result else None
-
-
-def select_many(connection, query, params=None):
-    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        cursor.execute(query, params)
-        results = cursor.fetchall()
-        return [dict(result) for result in results] if results else []
-
-
-def execute(connection, query, params=None):
-    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        cursor.execute(query, params)
+MOHIRAI_PRICE_PER_MS: float = 630 / 60 / 1000 * 100
+GENERAL_PROMPT_PRICE_PER_MS: float = 210 / 60 / 1000 * 100
+CHECKLIST_PROMPT_PRICE_PER_MS: float = 360 / 60 / 1000 * 100
 
 
 @db_connection_wrapper
@@ -187,8 +61,9 @@ def get_user_by_email(connection, email: str):
 
 
 @db_connection_wrapper
-def get_balance(connection, owner_id: str):
+def get_balance(connection: Connection, owner_id: str):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
+        logging.info(f"{type(connection)=} {type(cursor)=}")
         cursor.execute(
             "SELECT SUM(amount) FROM transaction WHERE owner_id = %s", (owner_id,)
         )
@@ -236,35 +111,64 @@ def remove_record(connection, record_id: str, owner_id: str):
             (record_id, owner_id),
         )
         deleted_record = dict(cursor.fetchone())
-        if deleted_record:
-            return deleted_record
-        else:
-            return None
+        return deleted_record if deleted_record else None
 
 
 @db_connection_wrapper
-def get_records_v1(connection, owner_id: str):
-    return select_many(
-        connection,
-        "SELECT * FROM record WHERE owner_id = %s",
-        (owner_id,),
-    )
+def get_records_v1(connection, owner_id: str, filter_params: t.Optional[dict] = {}):
+    filter_clause: str = build_audio_result_filter_predicate(filter_params)
+    sql_query: str = "SELECT * FROM record WHERE owner_id = %s and " + filter_clause
+    logging.info(f"Sql query for get_records: {sql_query=}")
+
+    return select_many(connection, sql_query, (owner_id,))
 
 
 @db_connection_wrapper
 def get_records_v2(connection, owner_id: str):
-    """Optimized version of previous one (line: 246)
+    """Optimized version of get_records_v1 (line: 246)
+    Uses postgres' JSON features, like selecting specefic key from `jsonb` payload.
     Difference: it will only select conversation_text from payload::json
     """
     return select_many(
         connection,
-        "select"
-        " id, owner_id, title, duration, operator_code, operator_name,"
-        " call_type, source, status, storage_id, created_at, updated_at,"
-        " deleted_at, payload#>'{result,conversation_text}' as conversation_text"
-        " from record where owner_id = %s",
+        "select "
+        "id, owner_id, title, duration, operator_code, operator_name, "
+        "call_type, source, status, storage_id, created_at, updated_at, "
+        "deleted_at, payload#>'{result,conversation_text}' as conversation_text "
+        "from record where owner_id = %s",
         (owner_id,),
     )
+
+
+def build_audio_result_filter_predicate(
+    filter_options: dict[
+        str, t.Union[str, int, bool]
+    ],  # why not kwargs? A: field name can be like this 'field->val'
+) -> str:
+    predicate: list[str] = ["1=1"]
+
+    for field, value in filter_options.items():
+        if value is None:
+            continue
+
+        operator, formatted_value = None, None
+
+        # in this case, if-else better than ternary stuff ...
+
+        if isinstance(value, str):
+            formatted_value: str = f"'{value}'"
+            operator = "ilike"
+        else:
+            formatted_value: str = str(value)
+            if isinstance(value, bool):
+                formatted_value = formatted_value.lower()
+            operator = "="
+
+        # yes, I know f-strings, even t-strings also
+        predicate.append("%s %s %s" % (field, operator, formatted_value))
+
+    predicate_str: str = " and ".join(predicate)
+    return predicate_str + ";"
 
 
 @db_connection_wrapper
@@ -433,12 +337,18 @@ def get_result_by_id(connection, result_id: str, owner_id: str):
 
 
 @db_connection_wrapper
-def get_result_by_record_id(connection, record_id: str, owner_id: str):
-    return select_one(
-        connection,
-        "SELECT * FROM result WHERE record_id = %s AND owner_id = %s",
-        (record_id, owner_id),
+def get_result_by_record_id(
+    connection, record_id: str, owner_id: str, filter_params: t.Optional[dict] = {}
+):
+    filter_clause: str = build_audio_result_filter_predicate(filter_params)
+
+    sql_query = (
+        "SELECT * FROM result WHERE record_id = %s AND owner_id = %s and "
+        + filter_clause
     )
+    logging.info(f"Sql query for get_result_by_record_id: {sql_query=}")
+
+    return select_one(connection, sql_query, (record_id, owner_id))
 
 
 @db_connection_wrapper
@@ -497,11 +407,6 @@ def get_results(connection, owner_id: str):
         """,
         (owner_id,),
     )
-
-
-MOHIRAI_PRICE_PER_MS = 630 / 60 / 1000 * 100
-GENERAL_PROMPT_PRICE_PER_MS = 210 / 60 / 1000 * 100
-CHECKLIST_PROMPT_PRICE_PER_MS = 360 / 60 / 1000 * 100
 
 
 @db_connection_wrapper
@@ -571,7 +476,7 @@ def upsert_operator(connection, operator: dict):
 
 
 @db_connection_wrapper
-def get_operators(connection, owner_id: str):
+def get_operators(connection: Connection, owner_id: str):
     return select_many(
         connection,
         "SELECT * FROM operator_data WHERE owner_id = %s",
@@ -589,7 +494,7 @@ def get_number_of_operators_records_count(
 
 
 @db_connection_wrapper
-def get_number_records(connection, owner_id: str):
+def get_number_records(connection: Connection, owner_id: str):
     query = "SELECT COUNT(*) FROM record WHERE owner_id = %s"
     params = (owner_id,)
     return select_one(connection, query, params)
