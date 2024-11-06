@@ -16,5 +16,3 @@ def up(cursor: psycopg2.extensions.cursor):
         ALTER TABLE "result" ADD "call_purpose" TEXT ;
         """
     )
-
-
