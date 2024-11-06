@@ -201,7 +201,7 @@ async def get_audio_and_results(
         mode="python", exclude_none=True
     )
     logging.info(f"{record_filter_params=} {result_filter_params=}")
-    
+
     recordings = db.get_records_v1(
         owner_id=str(current_user.id), filter_params=record_filter_params
     )

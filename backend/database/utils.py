@@ -40,7 +40,7 @@ def db_connection_wrapper(func):
 
         with ConnectionWrapper() as connection:
             exception = None
-            
+
             try:
                 return func(connection, *args, **kwargs)
             except Exception as exc:
