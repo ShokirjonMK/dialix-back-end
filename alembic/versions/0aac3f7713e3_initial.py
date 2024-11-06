@@ -44,6 +44,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("email"),
         sa.UniqueConstraint("username"),
+        if_not_exists=True,
     )
     op.create_table(
         "checklist",
@@ -70,6 +71,7 @@ def upgrade() -> None:
             ["account.id"],
         ),
         sa.PrimaryKeyConstraint("id"),
+        if_not_exists=True,
     )
     op.create_table(
         "record",
@@ -102,6 +104,7 @@ def upgrade() -> None:
             ["account.id"],
         ),
         sa.PrimaryKeyConstraint("id"),
+        if_not_exists=True,
     )
     op.create_table(
         "result",
@@ -149,6 +152,7 @@ def upgrade() -> None:
             ["record.id"],
         ),
         sa.PrimaryKeyConstraint("id"),
+        if_not_exists=True,
     )
     op.create_table(
         "transaction",
@@ -178,6 +182,7 @@ def upgrade() -> None:
             ["record.id"],
         ),
         sa.PrimaryKeyConstraint("id"),
+        if_not_exists=True,
     )
     # ### end Alembic commands ###
 
