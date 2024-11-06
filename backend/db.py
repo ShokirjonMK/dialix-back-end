@@ -65,7 +65,8 @@ def get_balance(connection: Connection, owner_id: str):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         logging.info(f"{type(connection)=} {type(cursor)=}")
         cursor.execute(
-            "SELECT SUM(amount) FROM transaction WHERE owner_id = %s", (owner_id,)
+            "SELECT SUM(amount) as sum FROM transaction WHERE owner_id = %s",
+            (owner_id,),
         )
         return dict(cursor.fetchone())
 
