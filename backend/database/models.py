@@ -1,113 +1,116 @@
-import uuid
+from uuid import uuid4
 
-from tortoise import fields
-from tortoise.models import Model
+from sqlalchemy import (
+    Column,
+    String,
+    ForeignKey,
+    JSON,
+    Boolean,
+    BigInteger,
+    TIMESTAMP,
+    TEXT,
+    text,
+)
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 
-fields.DatetimeField._db_postgres.SQL_TYPE = "TIMESTAMP"
-
-
-class Account(Model):
-    id = fields.UUIDField(pk=True, default=uuid.uuid4)
-    email = fields.CharField(max_length=255, unique=True)
-    username = fields.CharField(max_length=255, unique=True)
-    password = fields.CharField(max_length=255)
-    role = fields.CharField(max_length=255)
-    company_name = fields.CharField(max_length=255)
-    updated_at = fields.DatetimeField(auto_now=True)
-    created_at = fields.DatetimeField(auto_now_add=True)
-
-    class PydanticMeta:
-        exclude = ("password",)
+from backend.database import Base
 
 
-class Record(Model):
-    id = fields.UUIDField(pk=True, default=uuid.uuid4)
-    owner = fields.ForeignKeyField("models.Account", related_name="records")
-    title = fields.CharField(max_length=255)
-    duration = fields.BigIntField(null=True)
-    payload = fields.JSONField(null=True)
-    operator_code = fields.CharField(max_length=255, null=True)
-    operator_name = fields.CharField(max_length=255, null=True)
-    call_type = fields.CharField(max_length=255, null=True)
-    source = fields.CharField(max_length=255, null=True)
-    status = fields.CharField(max_length=255, null=True)
-    storage_id = fields.CharField(max_length=255, null=True)
-    created_at = fields.DatetimeField(auto_now_add=True)
-    updated_at = fields.DatetimeField(auto_now=True)
-    deleted_at = fields.DatetimeField(null=True)
+class Account(Base):
+    __tablename__ = "account"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True)
+    email = Column(String, nullable=False, unique=True)
+    username = Column(String, nullable=False, unique=True)
+    password = Column(String, nullable=False)
+    role = Column(String, nullable=False)
+    company_name = Column(String, nullable=False)
+    created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
 
 
-class Transaction(Model):
-    id = fields.UUIDField(pk=True, default=uuid.uuid4)
-    owner = fields.ForeignKeyField("models.Account", related_name="transactions")
-    amount = fields.BigIntField()
-    type = fields.CharField(max_length=255)
-    record = fields.ForeignKeyField(
-        "models.Record", related_name="transactions", null=True
+class Record(Base):
+    __tablename__ = "record"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True)
+    owner_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
     )
-    created_at = fields.DatetimeField(auto_now_add=True)
-    updated_at = fields.DatetimeField(auto_now=True)
+    title = Column(String, nullable=False)
+    duration = Column(BigInteger)
+    payload = Column(JSON)
+    operator_code = Column(String)
+    operator_name = Column(String)
+    call_type = Column(String)
+    source = Column(String)
+    status = Column(String)
+    storage_id = Column(String)
+    created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+    deleted_at = Column(TIMESTAMP)
 
 
-class Checklist(Model):
-    id = fields.UUIDField(pk=True, default=uuid.uuid4)
-    owner = fields.ForeignKeyField("models.Account", related_name="checklists")
-    title = fields.CharField(max_length=255)
-    payload = fields.JSONField(null=True)
-    active = fields.BooleanField(default=False)
-    created_at = fields.DatetimeField(auto_now_add=True)
-    updated_at = fields.DatetimeField(auto_now=True)
-    deleted_at = fields.DatetimeField(null=True)
+class Transaction(Base):
+    __tablename__ = "transaction"
 
-
-class Result(Model):
-    id = fields.UUIDField(pk=True, default=uuid.uuid4)
-    owner = fields.ForeignKeyField("models.Account", related_name="results")
-    record = fields.ForeignKeyField("models.Record", related_name="results")
-    checklist = fields.ForeignKeyField(
-        "models.Checklist", related_name="results", null=True
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True)
+    owner_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
     )
-    operator_answer_delay = fields.BigIntField(null=True)
-    operator_speech_duration = fields.BigIntField(null=True)
-    customer_speech_duration = fields.BigIntField(null=True)
-    is_conversation_over = fields.BooleanField(null=True)
-    sentiment_analysis_of_conversation = fields.CharField(max_length=255, null=True)
-    sentiment_analysis_of_operator = fields.CharField(max_length=255, null=True)
-    sentiment_analysis_of_customer = fields.CharField(max_length=255, null=True)
-    is_customer_satisfied = fields.BooleanField(null=True)
-    is_customer_agreed_to_buy = fields.BooleanField(null=True)
-    is_customer_interested_to_product = fields.BooleanField(null=True)
-    which_course_customer_interested = fields.CharField(max_length=255, null=True)
-    summary = fields.CharField(max_length=255, null=True)
-    customer_gender = fields.CharField(max_length=255, null=True)
-    checklist_result = fields.JSONField(null=True)
-    created_at = fields.DatetimeField(auto_now_add=True)
-    updated_at = fields.DatetimeField(auto_now=True)
-    deleted_at = fields.DatetimeField(null=True)
-
-    call_purpose = fields.TextField()
-    reason_for_conversation_sentiment = fields.TextField()
-    reason_for_operator_sentiment = fields.TextField()
-    list_of_words_define_operator_sentiment = fields.TextField()
-    reason_for_customer_sentiment = fields.TextField()
-    list_of_words_define_customer_sentiment = fields.TextField()
-    reason_for_customer_purchase = fields.TextField()
-    how_old_is_customer = fields.CharField(max_length=32)
-    which_platform_customer_found_about_the_course =  fields.CharField(max_length=32)
+    amount = Column(BigInteger, nullable=False)
+    type = Column(String, nullable=False)
+    record_id = Column(PostgresUUID(as_uuid=True), ForeignKey("record.id"))
+    created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
 
 
-class OperatorData(Model):
-    id = fields.UUIDField(pk=True, default=uuid.uuid4)
-    owner = fields.ForeignKeyField("models.Account", related_name="operator_data")
-    code = fields.IntField()
-    name = fields.CharField(max_length=255)
-    created_at = fields.DatetimeField(auto_now_add=True)
-    updated_at = fields.DatetimeField(auto_now=True)
-    deleted_at = fields.DatetimeField(null=True)
+class Checklist(Base):
+    __tablename__ = "checklist"
 
-    class Meta:
-        table = "operator_data"
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True)
+    owner_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
+    )
+    title = Column(String, nullable=False)
+    payload = Column(JSON)
+    active = Column(Boolean, server_default="false", nullable=False)
+    created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+    deleted_at = Column(TIMESTAMP)
 
 
-class BlackListToken(Model):
-    value = fields.TextField()
+class Result(Base):
+    __tablename__ = "result"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True)
+    owner_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
+    )
+    record_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("record.id"), nullable=False
+    )
+    checklist_id = Column(PostgresUUID(as_uuid=True), ForeignKey("checklist.id"))
+    operator_answer_delay = Column(BigInteger)
+    operator_speech_duration = Column(BigInteger)
+    customer_speech_duration = Column(BigInteger)
+    is_conversation_over = Column(Boolean)
+    sentiment_analysis_of_conversation = Column(String)
+    sentiment_analysis_of_operator = Column(String)
+    sentiment_analysis_of_customer = Column(String)
+    is_customer_satisfied = Column(Boolean)
+    is_customer_agreed_to_buy = Column(Boolean)
+    is_customer_interested_to_product = Column(Boolean)
+    which_course_customer_interested = Column(String)
+    summary = Column(String)
+    customer_gender = Column(String)
+    checklist_result = Column(JSON)
+    created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+    deleted_at = Column(TIMESTAMP)
+
+
+class BlackListToken(Base):
+    __tablename__ = "blacklist_token"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+    value = Column(TEXT)
