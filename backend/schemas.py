@@ -2,7 +2,14 @@ import typing as t
 from uuid import UUID, uuid4
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, StringConstraints, root_validator
+from pydantic import (
+    BaseModel,
+    EmailStr,
+    Field,
+    StringConstraints,
+    root_validator,
+    ConfigDict,
+)
 
 
 class UserCreate(BaseModel):
@@ -15,17 +22,19 @@ class UserCreate(BaseModel):
 
 
 class User(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
     username: str
-    password: str
     email: EmailStr
     role: str
     company_name: str
     created_at: datetime
     updated_at: datetime
 
-    def hide_password(self):
-        return self.copy(exclude={"password": ...})
+
+class UserPrivate(User):
+    password: str
 
 
 class CheckList(BaseModel):
