@@ -34,7 +34,7 @@ from utils.data_manipulation import (
 
 from workers.api import api_processing
 from workers.data import upsert_data
-
+from backend.core.dependencies import DatabaseSessionDependency
 
 api_router = APIRouter()
 
@@ -127,9 +127,9 @@ def calculate_daily_satisfaction(data):
     }
 
 
-async def process_form_data(request: Request):
+async def process_form_data(request: Request, db_session: DatabaseSessionDependency):
     form = await request.form()
-    current_user = await get_current_user(request)
+    current_user = await get_current_user(request, db_session)
     files = form.getlist("files")
     logging.info(f"{files=}")
     general = [gen == "true" for gen in form.getlist("general")]
