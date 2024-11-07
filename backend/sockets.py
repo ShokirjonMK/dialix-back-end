@@ -6,6 +6,8 @@ from fastapi import HTTPException
 from backend.core import auth
 from http.cookies import SimpleCookie
 
+from backend.database.session_manager import get_db_session
+
 REDIS_URL: str = config("REDIS_URL")
 
 redis_manager = socketio.AsyncRedisManager(REDIS_URL)
@@ -38,7 +40,11 @@ async def connect(sid, environ):
             cookie.get("access_token").value if "access_token" in cookie else None
         )
         if access_token:
-            user = dict(await auth.get_current_user_websocket(access_token))
+            user = dict(
+                await auth.get_current_user_websocket(
+                    access_token, next(get_db_session())
+                )
+            )
             await sio_server.save_session(sid, {"user": user})
             await sio_server.enter_room(sid, f"user/{user['id']}")
         else:
