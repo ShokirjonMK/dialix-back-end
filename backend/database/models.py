@@ -9,6 +9,7 @@ from sqlalchemy import (
     BigInteger,
     TIMESTAMP,
     TEXT,
+    Integer,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
@@ -44,6 +45,7 @@ class Record(Base):
     call_type = Column(String)
     source = Column(String)
     status = Column(String)
+    client_phone_number = Column(String)
     storage_id = Column(String)
     created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
     updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
@@ -114,3 +116,19 @@ class BlackListToken(Base):
 
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
     value = Column(TEXT)
+
+
+class OperatorData(Base):
+    __tablename__ = "operator_data"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+    owner_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
+    )
+    code = Column(Integer, nullable=False)
+    name = Column(String, nullable=False)
+    created_at = Column(TIMESTAMP, nullable=False, server_default=text("now()"))
+    updated_at = Column(
+        TIMESTAMP, nullable=False, server_default=text("now()"), onupdate=text("now()")
+    )
+    deleted_at = Column(TIMESTAMP, nullable=True)

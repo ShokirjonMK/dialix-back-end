@@ -1,8 +1,6 @@
 import os
 import sys
-import logging
 import datetime
-import typing as t
 from platform import node as get_hostname
 
 from fastapi import FastAPI, status
@@ -23,8 +21,7 @@ from backend.routers.user import user_router
 from backend.routers.checklist import checklist_router
 
 from backend.core import settings
-
-from sqlalchemy import text
+from backend.utils.healthcheck import is_db_working
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -59,21 +56,14 @@ application.add_middleware(CORSMiddleware, **settings.CORS_SETTINGS)
 
 @application.get("/health")
 async def healthcheck(db_session: DatabaseSessionDependency):
-    db_version: None | t.Any = None
-
-    try:
-        db_version = db_session.execute(text("select version();")).scalar()
-        logging.info(f"{db_version=}")
-    except Exception as exc:
-        logging.error(f"Can't connect to database: {exc=} {db_version=}")
-        db_version = None
+    db_status = is_db_working()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "database": db_version,
+            "is_db_working": db_status,
             "hostname": get_hostname(),
             "time": datetime.datetime.now().isoformat(),
-            "status": "!ok" if db_version is None else "ok",
+            "status": "!ok" if not db_status else "ok",
         },
     )

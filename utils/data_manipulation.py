@@ -190,3 +190,7 @@ def find_call_type(title):
         return "outbound"
     else:
         return "unknown"  # Default in case the format is unexpected
+
+
+def find_phone_number(title: str) -> str:
+    return None

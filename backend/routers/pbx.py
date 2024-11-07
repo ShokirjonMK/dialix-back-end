@@ -111,6 +111,7 @@ async def list_call_history(
     page_number: int,
     page_size: t.Optional[int] = 10,
 ):
+    logging.info("Preparing and sending request ...")
     url = f"{settings.PBX_API_URL.format(domain=domain)}/mongo_history/search.json"
 
     response = requests.post(
@@ -123,6 +124,9 @@ async def list_call_history(
     )
     response.raise_for_status()
     json_response = response.json()
+
+    logging.info("Response is received ...")
+
     if int(json_response["status"]) == 0:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail=json_response["comment"]
@@ -191,7 +195,9 @@ async def process_from_call_history(
         current_user=current_user,
         _operator_code=call_info["caller_id_number"],
         _call_type=call_info["accountcode"],
+        _destination_number=call_info["destination_number"],
     )
+
     logging.info(f"Analysis endpoint's {response.status_code=} {response.body=}")
 
     return response
