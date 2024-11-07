@@ -1,5 +1,4 @@
 import os
-import logging
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -16,10 +15,6 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata: MetaData = Base.metadata
-
-for index, table_name in enumerate(target_metadata.tables):
-    logging.info(f"{index+1}. {table_name=}")
-
 
 def get_url():
     return os.getenv("DATABASE_URL")
