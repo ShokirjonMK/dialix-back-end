@@ -61,7 +61,7 @@ def get_current_user(
 
 
 async def get_current_user_websocket(
-    db_session: DatabaseSessionDependency, token: str
+    token: str, db_session: DatabaseSessionDependency
 ) -> Account:
     if not token:
         return None
