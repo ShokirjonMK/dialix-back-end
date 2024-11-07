@@ -26,7 +26,11 @@ from backend.schemas import (
 from utils.storage import get_stream_url, upload_file
 from utils.audio import get_audio_duration
 from utils.encoder import adapt_json
-from utils.data_manipulation import find_operator_code, find_call_type
+from utils.data_manipulation import (
+    find_operator_code,
+    find_call_type,
+    find_phone_number,
+)
 
 from workers.api import api_processing
 from workers.data import upsert_data
@@ -300,7 +304,8 @@ async def analyze_data(
     ] = Depends(process_form_data),
     current_user: User = Depends(get_current_user),
     _operator_code: Optional[str] = None,  # for now, internal use only
-    _call_type: Optional[str] = None,
+    _call_type: Optional[str] = None,  # for now, internal use only
+    _destination_number: Optional[str] = None,  # for now, internal use only
 ):
     responses = []
 
@@ -330,8 +335,11 @@ async def analyze_data(
         task_id = get_task_id(user_id=current_user.id)
         operator_code = _operator_code or find_operator_code(file.filename)
         call_type = _call_type or find_call_type(file.filename)
+        client_phone_number = _destination_number or find_phone_number(file.filename)
 
-        logging.info(f"{_operator_code=} {_call_type=} {operator_code=} {call_type=}")
+        logging.info(
+            f"Metadata: {_operator_code=} {_call_type=} {_destination_number} {operator_code=} {call_type=} {client_phone_number}"
+        )
 
         operator = (
             db.get_operator_name_by_code(owner_id=owner_id, code=operator_code) or {}
@@ -348,11 +356,10 @@ async def analyze_data(
             "status": status,
             "duration": duration * 1000,
             "storage_id": storage_id,
+            "client_phone_number": client_phone_number,
         }
 
-        audio_record = db.upsert_record(
-            record=record,
-        )
+        audio_record = db.upsert_record(record=record)
 
         logging.warning(
             f"Audio record: {audio_record} with id: {record_id} and owner_id: {current_user.id}"
