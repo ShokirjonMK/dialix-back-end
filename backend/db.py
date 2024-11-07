@@ -146,6 +146,7 @@ def build_audio_result_filter_predicate(
         str, t.Union[str, int, bool]
     ],  # why not kwargs? A: field name can be like this 'field->val'
 ) -> str:
+    # if you don't use ORMs or query builders, that's the only way ...
     predicate: list[str] = ["1=1"]
 
     for field, value in filter_options.items():

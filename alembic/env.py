@@ -16,6 +16,7 @@ if config.config_file_name is not None:
 
 target_metadata: MetaData = Base.metadata
 
+
 def get_url():
     return os.getenv("DATABASE_URL")
 
