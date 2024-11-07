@@ -201,6 +201,7 @@ class RecordQueryParams(BaseModel):
     operator_name: t.Optional[str] = None
     call_type: t.Optional[str] = None
     call_status: t.Optional[str] = None
+    client_phone_number: t.Optional[str] = None
 
 
 class ResultQueryParams(BaseModel):
