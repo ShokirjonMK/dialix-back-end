@@ -2,6 +2,8 @@ import re
 import json
 import logging
 
+PHONENUMBER_LENGTH: int = 9  # without +998
+
 
 def extract_specific_part(input_str):
     # Pattern to match the desired format
@@ -168,29 +170,30 @@ def find_operator_code(title):
 
     if len(number_1) == 3:
         operator_code = number_1
+
     elif len(number_2) == 3:
         operator_code = number_2
     else:
         operator_code = None
+
     return operator_code
 
 
 def find_call_type(title):
-    # Extract numbers (assuming they are separated by underscores)
     parts = title.split("_")
 
-    # Extract the phone number and operator number based on their position
-    number_1 = parts[-1].split(".")[0]  # Removing the file extension if any
+    number_1 = parts[-1].split(".")[0]
     number_2 = parts[-2]
 
-    # Determine if the call is inbound or outbound
     if len(number_1) == 3:
         return "inbound"
     elif len(number_2) == 3:
         return "outbound"
     else:
-        return "unknown"  # Default in case the format is unexpected
+        return "unknown"
 
 
-def find_phone_number(title: str) -> str:
-    return None
+def get_phone_number_from_filename(filename: str) -> str:
+    filename_last_part = filename.split("_")[-1]
+    phonenumber: str = filename_last_part.split(".")[0]
+    return phonenumber if len(phonenumber) == PHONENUMBER_LENGTH else "unknown"

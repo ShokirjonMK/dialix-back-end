@@ -29,7 +29,7 @@ from utils.encoder import adapt_json
 from utils.data_manipulation import (
     find_operator_code,
     find_call_type,
-    find_phone_number,
+    get_phone_number_from_filename,
 )
 
 from workers.api import api_processing
@@ -39,9 +39,8 @@ from workers.data import upsert_data
 api_router = APIRouter()
 
 
-def get_task_id(user_id):
-    task_id = f"{user_id}/{uuid.uuid4()}"
-    return task_id
+def generate_task_id(user_id) -> str:
+    return f"{user_id}/{uuid.uuid4()}"
 
 
 def get_object_storage_id(extension):
@@ -332,13 +331,17 @@ async def analyze_data(
         logging.info(
             f"folder_name: {folder_name} storage_id: {storage_id}, bucket: {bucket}"
         )
-        task_id = get_task_id(user_id=current_user.id)
+        task_id = generate_task_id(user_id=current_user.id)
+
         operator_code = _operator_code or find_operator_code(file.filename)
         call_type = _call_type or find_call_type(file.filename)
-        client_phone_number = _destination_number or find_phone_number(file.filename)
+        client_phone_number = _destination_number or get_phone_number_from_filename(
+            file.filename
+        )
 
         logging.info(
-            f"Metadata: {_operator_code=} {_call_type=} {_destination_number} {operator_code=} {call_type=} {client_phone_number}"
+            f"Metadata: {_operator_code=} {_call_type=} {_destination_number=}"
+            f" => {operator_code=} {call_type=} {client_phone_number}"
         )
 
         operator = (
@@ -468,7 +471,7 @@ async def reprocess_data(
     }
     db.upsert_record(record=record)
 
-    task_id = get_task_id(user_id=current_user.id)
+    task_id = generate_task_id(user_id=current_user.id)
 
     task: AsyncResult = api_processing.apply_async(
         kwargs={
