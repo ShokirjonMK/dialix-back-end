@@ -129,7 +129,7 @@ def calculate_daily_satisfaction(data):
 
 async def process_form_data(request: Request, db_session: DatabaseSessionDependency):
     form = await request.form()
-    current_user = await get_current_user(request, db_session)
+    current_user = get_current_user(request, db_session)
     files = form.getlist("files")
     logging.info(f"{files=}")
     general = [gen == "true" for gen in form.getlist("general")]
