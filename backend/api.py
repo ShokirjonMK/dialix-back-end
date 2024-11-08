@@ -223,6 +223,12 @@ async def get_audio_and_results(
             owner_id=str(current_user.id),
             filter_params=result_filter_params,
         )
+        if result_filter_params:
+            if result is None:
+                # if filters are being applied, and results is NONE then
+                # we don't include this recording
+                continue
+
         audio_url = get_stream_url(f"{folder_name}/{record['storage_id']}")
         record["audio_url"] = audio_url
 
