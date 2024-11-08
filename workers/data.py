@@ -83,7 +83,7 @@ def upsert_data(self: PredictTask, *args, **kwargs):
                     checklist_response.strip("`").strip("json").strip("\n")
                 )
             )
-            
+
             checklist_response = json.loads(
                 checklist_response.strip("`").strip("json").strip("\n")
             )
