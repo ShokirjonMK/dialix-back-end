@@ -195,7 +195,6 @@ class PBXCallHistoryRequest(BaseModel):
 
 
 class RecordQueryParams(BaseModel):
-    title: t.Optional[str] = None
     duration: t.Optional[int] = None
     operator_code: t.Union[str, int, None] = None
     operator_name: t.Optional[str] = None

@@ -106,6 +106,17 @@ class Result(Base):
     summary = Column(String)
     customer_gender = Column(String)
     checklist_result = Column(JSON)
+
+    call_purpose = Column(TEXT)
+    how_old_is_customer = Column(String)
+    reason_for_customer_purchase = Column(TEXT)
+    reason_for_customer_sentiment = Column(TEXT)
+    reason_for_operator_sentiment = Column(TEXT)
+    reason_for_conversation_sentiment = Column(TEXT)
+    list_of_words_define_customer_sentiment = Column(TEXT)
+    list_of_words_define_operator_sentiment = Column(TEXT)
+    which_platform_customer_found_about_the_course = Column(String)
+
     created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
     updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
     deleted_at = Column(TIMESTAMP)
