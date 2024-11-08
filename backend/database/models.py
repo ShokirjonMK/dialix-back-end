@@ -14,6 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 
+
 from backend.database import Base
 
 
@@ -73,7 +74,7 @@ class Checklist(Base):
     owner_id = Column(
         PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
     )
-    title = Column(String, nullable=False)
+    title = Column(String, nullable=False, unique=True)
     payload = Column(JSON)
     active = Column(Boolean, server_default="false", nullable=False)
     created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
