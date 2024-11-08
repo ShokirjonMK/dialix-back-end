@@ -27,21 +27,8 @@ CORS_SETTINGS: dict[str, t.Any] = {
 ###
 # Database
 ###
-DATABASE_URL: str = config("DATABASE_URL").replace("postgresql", "postgres")
-
-TORTOISE_CONFIG: dict[str, t.Any] = {
-    "connections": {
-        "default": DATABASE_URL,
-    },
-    "apps": {
-        "models": {
-            "models": ["backend.database.models", "aerich.models"],
-            "default_connection": "default",
-        }
-    },
-    "use_tz": False,
-    "timezone": "UTC",
-}
+DATABASE_URL: str = config("DATABASE_URL")
+ECHO_SQL: bool = config("ECHO_SQL", cast=bool, default=False)
 
 ###
 # Auth

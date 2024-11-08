@@ -2,7 +2,14 @@ import typing as t
 from uuid import UUID, uuid4
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, StringConstraints, root_validator
+from pydantic import (
+    BaseModel,
+    EmailStr,
+    Field,
+    StringConstraints,
+    root_validator,
+    ConfigDict,
+)
 
 
 class UserCreate(BaseModel):
@@ -15,17 +22,19 @@ class UserCreate(BaseModel):
 
 
 class User(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
     username: str
-    password: str
     email: EmailStr
     role: str
     company_name: str
     created_at: datetime
     updated_at: datetime
 
-    def hide_password(self):
-        return self.copy(exclude={"password": ...})
+
+class UserPrivate(User):
+    password: str
 
 
 class CheckList(BaseModel):
@@ -183,3 +192,25 @@ class PBXCallHistoryRequest(BaseModel):
     # accountcode: t.Optional[str] = Field(
     #     default=None, description="Account code for the call, e.g., 'ACC123456'"
     # )
+
+
+class RecordQueryParams(BaseModel):
+    duration: t.Optional[int] = None
+    operator_code: t.Union[str, int, None] = None
+    operator_name: t.Optional[str] = None
+    call_type: t.Optional[str] = None
+    call_status: t.Optional[str] = None
+    client_phone_number: t.Optional[str] = None
+
+
+class ResultQueryParams(BaseModel):
+    is_conversation_over: t.Optional[bool] = None
+    sentiment_analysis_of_conversation: t.Optional[str] = None
+    sentiment_analysis_of_operator: t.Optional[str] = None
+    sentiment_analysis_of_customer: t.Optional[str] = None
+    is_customer_satisfied: t.Optional[bool] = None
+    is_customer_agreed_to_buy: t.Optional[bool] = None
+    is_customer_interested_to_product: t.Optional[bool] = None
+    reason_for_customer_purchase: t.Optional[str] = None
+    which_platform_customer_found_about_the_course: t.Optional[str] = None
+    call_purpose: t.Optional[str] = None

@@ -1,14 +1,16 @@
 import re
 import os
+import logging  # noqa: F401
 import datetime
-import logging
 from decouple import config
 
 from filelock import FileLock
 from google.cloud import storage
 from utils.redis_utils import cache
 
-storage_client: storage.Client() = None
+storage_client: storage.Client | None = None
+
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = config("GOOGLE_APPLICATION_CREDENTIALS")
 
 
 def get_client():

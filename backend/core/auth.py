@@ -5,19 +5,24 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 from jose import jwt, JWTError
 
+from sqlalchemy.orm import Session
+
 from fastapi import status
 from fastapi import HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 
+from backend.database.models import Account
+from backend.utils.auth import is_token_blacklisted
 from backend.core.settings import ALGORITHM, SECRET_KEY
-
-from backend.database.model_schemas import AccountPydantic
-from backend.database.models import Account, BlackListToken
+from backend.core.dependencies import DatabaseSessionDependency
+from backend.services.user import get_user_by_id, get_user_by_username
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
-async def get_current_user(request: Request):
+def get_current_user(
+    request: Request, db_session: DatabaseSessionDependency
+) -> Account:
     token = request.cookies.get("access_token")
 
     if not token:
@@ -25,7 +30,7 @@ async def get_current_user(request: Request):
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
         )
 
-    if await BlackListToken.filter(value=token).exists():
+    if is_token_blacklisted(db_session, token):
         logging.info(f"Received blacklisted token: {token[:15]}...")
 
         raise HTTPException(
@@ -44,7 +49,7 @@ async def get_current_user(request: Request):
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is invalid"
         )
 
-    account = await Account.filter(id=user_id).first()
+    account = get_user_by_id(db_session, user_id)
 
     if not account:
         raise HTTPException(
@@ -52,14 +57,16 @@ async def get_current_user(request: Request):
             detail="User does not exist, you probably gave hard coded user_id",
         )
 
-    return await AccountPydantic.from_tortoise_orm(account)
+    return account
 
 
-async def get_current_user_websocket(token: str):
+def get_current_user_websocket(
+    token: str, db_session: DatabaseSessionDependency
+) -> Account:
     if not token:
         return None
 
-    if await BlackListToken.filter(value=token).exists():
+    if is_token_blacklisted(db_session, token):
         logging.info(f"Received blacklisted token: {token[:15]}...")
         return None
 
@@ -69,16 +76,16 @@ async def get_current_user_websocket(token: str):
     except JWTError:
         return None
 
-    account = await Account.filter(id=user_id).first()
+    account = get_user_by_username(db_session, user_id)
 
     if not account:
         return None
 
-    return await AccountPydantic.from_tortoise_orm(account)
+    return account
 
 
-async def authenticate_user(username: str, password: str):
-    account = await Account.filter(username=username).first()
+def authenticate_user(db_session: Session, username: str, password: str):
+    account: Account | None = get_user_by_username(db_session, username)
 
     if account is None:
         return
@@ -89,7 +96,7 @@ async def authenticate_user(username: str, password: str):
     )
 
     if account and password_matches:
-        return await AccountPydantic.from_tortoise_orm(account)
+        return account
 
     return
 
