@@ -1,5 +1,5 @@
-import os
 from logging.config import fileConfig
+from decouple import config as get_env_var
 
 from sqlalchemy import pool
 from sqlalchemy import engine_from_config
@@ -18,7 +18,7 @@ target_metadata: MetaData = Base.metadata
 
 
 def get_url():
-    return os.getenv("DATABASE_URL")
+    return get_env_var("DATABASE_URL")
 
 
 def run_migrations_offline() -> None:
