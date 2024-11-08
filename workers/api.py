@@ -118,7 +118,7 @@ def general_checker(text, general_prompt, courses_list, checklist=None):
                 },
                 {"role": "user", "content": text},
             ],
-            temperature = 0.2
+            temperature=0.2,
         )
 
         # Assuming the response structure has the corrected text in a specific field
@@ -126,7 +126,7 @@ def general_checker(text, general_prompt, courses_list, checklist=None):
             response.get("choices", [{}])[0].get("message", {}).get("content", "")
         )
         try:
-            corrected_text = corrected_text.strip().replace("`","'")
+            corrected_text = corrected_text.strip().replace("`", "'")
         except:
             print("corrected text failed")
         return corrected_text
