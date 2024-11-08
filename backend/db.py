@@ -14,6 +14,8 @@ import psycopg2
 import psycopg2.extras
 from psycopg2.extensions import register_adapter, connection as Connection
 
+from backend.services.record import get_records_sa
+from backend.services.result import get_results_by_record_id_sa
 from backend.database.utils import db_connection_wrapper, select_many, select_one
 
 register_adapter(uuid.UUID, lambda _uuid: psycopg2.extensions.AsIs(str(uuid)))
@@ -24,7 +26,7 @@ CHECKLIST_PROMPT_PRICE_PER_MS: float = 360 / 60 / 1000 * 100
 
 
 @db_connection_wrapper
-def create_user(connection, user_data: dict):
+def create_user(connection: Connection, user_data: dict):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute(
             """
@@ -47,14 +49,14 @@ def create_user(connection, user_data: dict):
 
 
 @db_connection_wrapper
-def get_user_by_id(connection, user_id: str):
+def get_user_by_id(connection: Connection, user_id: str):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute("SELECT * FROM account WHERE id = %s", (user_id,))
         return cursor.fetchone()
 
 
 @db_connection_wrapper
-def get_user_by_email(connection, email: str):
+def get_user_by_email(connection: Connection, email: str):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute("SELECT * FROM account WHERE email = %s", (email,))
         return dict(cursor.fetchone())
@@ -72,7 +74,7 @@ def get_balance(connection: Connection, owner_id: str):
 
 
 @db_connection_wrapper
-def upsert_record(connection, record):
+def upsert_record(connection: Connection, record):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         keys = [key for key in record.keys() if key not in ["created_at", "updated_at"]]
         id = record.get("id")
@@ -96,7 +98,7 @@ def upsert_record(connection, record):
 
 
 @db_connection_wrapper
-def get_record_by_id(connection, record_id: str, owner_id: str):
+def get_record_by_id(connection: Connection, record_id: str, owner_id: str):
     return select_one(
         connection,
         "SELECT * FROM record WHERE id = %s AND owner_id = %s",
@@ -105,7 +107,7 @@ def get_record_by_id(connection, record_id: str, owner_id: str):
 
 
 @db_connection_wrapper
-def remove_record(connection, record_id: str, owner_id: str):
+def remove_record(connection: Connection, record_id: str, owner_id: str):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute(
             "DELETE FROM record WHERE id = %s AND owner_id = %s",
@@ -116,16 +118,15 @@ def remove_record(connection, record_id: str, owner_id: str):
 
 
 @db_connection_wrapper
-def get_records_v1(connection, owner_id: str, filter_params: t.Optional[dict] = {}):
-    filter_clause: str = build_audio_result_filter_predicate(filter_params)
-    sql_query: str = "SELECT * FROM record WHERE owner_id = %s and " + filter_clause
-    logging.info(f"Sql query for get_records: {sql_query=}")
-
-    return select_many(connection, sql_query, (owner_id,))
+def get_records_v1(
+    connection: Connection, owner_id: str, filter_params: t.Optional[dict] = None
+):
+    sql_query, query_params = get_records_sa(owner_id, **filter_params)
+    return select_many(connection, sql_query, query_params)
 
 
 @db_connection_wrapper
-def get_records_v2(connection, owner_id: str):
+def get_records_v2(connection: Connection, owner_id: str):
     """Optimized version of get_records_v1 (line: 246)
     Uses postgres' JSON features, like selecting specefic key from `jsonb` payload.
     Difference: it will only select conversation_text from payload::json
@@ -139,38 +140,6 @@ def get_records_v2(connection, owner_id: str):
         "from record where owner_id = %s",
         (owner_id,),
     )
-
-
-def build_audio_result_filter_predicate(
-    filter_options: dict[
-        str, t.Union[str, int, bool]
-    ],  # why not kwargs? A: field name can be like this 'field->val'
-) -> str:
-    # if you don't use ORMs or query builders, that's the only way ...
-    predicate: list[str] = ["1=1"]
-
-    for field, value in filter_options.items():
-        if value is None:
-            continue
-
-        operator, formatted_value = None, None
-
-        # in this case, if-else better than ternary stuff ...
-
-        if isinstance(value, str):
-            formatted_value: str = f"'{value}'"
-            operator = "ilike"
-        else:
-            formatted_value: str = str(value)
-            if isinstance(value, bool):
-                formatted_value = formatted_value.lower()
-            operator = "="
-
-        # yes, I know f-strings, even t-strings also
-        predicate.append("%s %s %s" % (field, operator, formatted_value))
-
-    predicate_str: str = " and ".join(predicate)
-    return predicate_str + ";"
 
 
 @db_connection_wrapper
@@ -340,17 +309,12 @@ def get_result_by_id(connection, result_id: str, owner_id: str):
 
 @db_connection_wrapper
 def get_result_by_record_id(
-    connection, record_id: str, owner_id: str, filter_params: t.Optional[dict] = {}
+    connection, record_id: str, owner_id: str, filter_params: t.Optional[dict] = None
 ):
-    filter_clause: str = build_audio_result_filter_predicate(filter_params)
-
-    sql_query = (
-        "SELECT * FROM result WHERE record_id = %s AND owner_id = %s and "
-        + filter_clause
+    sql_query, query_params = get_results_by_record_id_sa(
+        record_id, owner_id, **filter_params
     )
-    logging.info(f"Sql query for get_result_by_record_id: {sql_query=}")
-
-    return select_one(connection, sql_query, (record_id, owner_id))
+    return select_one(connection, sql_query, query_params)
 
 
 @db_connection_wrapper

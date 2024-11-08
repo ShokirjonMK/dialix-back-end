@@ -6,7 +6,10 @@ from decouple import config
 import psycopg2
 import psycopg2.extras
 from psycopg2.pool import SimpleConnectionPool
+from psycopg2.extensions import connection as Connection
 
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql.selectable import Select
 
 pool: SimpleConnectionPool | None = None
 
@@ -62,15 +65,22 @@ def db_connection_wrapper(func):
     return wrapper
 
 
-def select_one(connection, query, params=None) -> dict | None:
+def select_one(connection: Connection, query, params=None) -> dict | None:
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute(query, params)
         result = cursor.fetchone()
         return dict(result) if result else None
 
 
-def select_many(connection, query, params=None) -> list[dict] | list:
+def select_many(connection: Connection, query, params=None) -> list[dict] | list:
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute(query, params)
         results = cursor.fetchall()
         return [dict(result) for result in results] if results else []
+
+
+def compile_sql_query_and_params(
+    statement: Select,
+) -> tuple[str, dict]:  # most of the time
+    sql_query = statement.compile(dialect=postgresql.dialect())
+    return str(sql_query), sql_query.params
