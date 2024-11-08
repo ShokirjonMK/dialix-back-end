@@ -143,7 +143,7 @@ def get_records_v2(connection: Connection, owner_id: str):
 
 
 @db_connection_wrapper
-def get_count_of_records(connection, owner_id: str):
+def get_count_of_records(connection: Connection, owner_id: str):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute(
             "SELECT COUNT(*) FROM record WHERE owner_id = %s",
@@ -153,7 +153,7 @@ def get_count_of_records(connection, owner_id: str):
 
 
 @db_connection_wrapper
-def get_pending_audios(connection, owner_id: str):
+def get_pending_audios(connection: Connection, owner_id: str):
     return select_many(
         connection,
         "SELECT * FROM record WHERE owner_id = %s AND status = 'PENDING'",
@@ -162,7 +162,7 @@ def get_pending_audios(connection, owner_id: str):
 
 
 @db_connection_wrapper
-def upsert_checklist(connection, checklist: dict):
+def upsert_checklist(connection: Connection, checklist: dict):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         keys = [key for key in checklist if key not in ["created_at", "updated_at"]]
         id = checklist["id"]
@@ -193,7 +193,7 @@ def upsert_checklist(connection, checklist: dict):
 
 
 @db_connection_wrapper
-def update_checklist(connection, checklist_id: str, update_data: dict):
+def update_checklist(connection: Connection, checklist_id: str, update_data: dict):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         keys = [f"{key} = %s" for key in update_data]
         values = list(update_data.values())
@@ -213,7 +213,7 @@ def update_checklist(connection, checklist_id: str, update_data: dict):
 
 
 @db_connection_wrapper
-def get_checklists(connection, owner_id: str):
+def get_checklists(connection: Connection, owner_id: str):
     return select_many(
         connection,
         "SELECT * FROM checklist WHERE owner_id = %s",
@@ -222,7 +222,7 @@ def get_checklists(connection, owner_id: str):
 
 
 @db_connection_wrapper
-def get_checklist_by_id(connection, checklist_id: str, owner_id: str):
+def get_checklist_by_id(connection: Connection, checklist_id: str, owner_id: str):
     return select_one(
         connection,
         "SELECT * FROM checklist WHERE id = %s AND owner_id = %s",
@@ -231,7 +231,7 @@ def get_checklist_by_id(connection, checklist_id: str, owner_id: str):
 
 
 @db_connection_wrapper
-def activate_checklist(connection, checklist_id: str, owner_id: str):
+def activate_checklist(connection: Connection, checklist_id: str, owner_id: str):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute(
             "UPDATE checklist SET active = FALSE WHERE owner_id = %s",
@@ -246,7 +246,7 @@ def activate_checklist(connection, checklist_id: str, owner_id: str):
 
 
 @db_connection_wrapper
-def get_active_checklist(connection, owner_id: str):
+def get_active_checklist(connection: Connection, owner_id: str):
     return select_one(
         connection,
         "SELECT * FROM checklist WHERE owner_id = %s AND active = TRUE",
@@ -255,7 +255,7 @@ def get_active_checklist(connection, owner_id: str):
 
 
 @db_connection_wrapper
-def delete_checklist(connection, checklist_id: str, owner_id: str):
+def delete_checklist(connection: Connection, checklist_id: str, owner_id: str):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute(
             "DELETE FROM checklist WHERE id = %s AND owner_id = %s RETURNING *",
@@ -269,10 +269,7 @@ def delete_checklist(connection, checklist_id: str, owner_id: str):
 
 
 @db_connection_wrapper
-def upsert_result(
-    connection,
-    result: dict,
-):
+def upsert_result(connection: Connection, result: dict):
     logging.info(f"Inserting result data: {result=}")
 
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
@@ -299,7 +296,7 @@ def upsert_result(
 
 
 @db_connection_wrapper
-def get_result_by_id(connection, result_id: str, owner_id: str):
+def get_result_by_id(connection: Connection, result_id: str, owner_id: str):
     return select_one(
         connection,
         "SELECT * FROM result WHERE id = %s AND owner_id = %s",
@@ -309,7 +306,10 @@ def get_result_by_id(connection, result_id: str, owner_id: str):
 
 @db_connection_wrapper
 def get_result_by_record_id(
-    connection, record_id: str, owner_id: str, filter_params: t.Optional[dict] = None
+    connection: Connection,
+    record_id: str,
+    owner_id: str,
+    filter_params: t.Optional[dict] = None,
 ):
     sql_query, query_params = get_results_by_record_id_sa(
         record_id, owner_id, **filter_params
@@ -318,7 +318,7 @@ def get_result_by_record_id(
 
 
 @db_connection_wrapper
-def remove_result(connection, result_id: str, owner_id: str):
+def remove_result(connection: Connection, result_id: str, owner_id: str):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute(
             "DELETE FROM result WHERE id = %s AND owner_id = %s RETURNING *",
@@ -332,7 +332,7 @@ def remove_result(connection, result_id: str, owner_id: str):
 
 
 @db_connection_wrapper
-def get_results(connection, owner_id: str):
+def get_results(connection: Connection, owner_id: str):
     return select_many(
         connection,
         """
@@ -376,13 +376,7 @@ def get_results(connection, owner_id: str):
 
 
 @db_connection_wrapper
-def create_transaction(
-    connection,
-    owner_id,
-    record_id,
-    amount,
-    type,
-):
+def create_transaction(connection: Connection, owner_id, record_id, amount, type):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute(
             """
@@ -403,7 +397,7 @@ def create_transaction(
 
 @db_connection_wrapper
 def create_topup_transaction(
-    connection,
+    connection: Connection,
     owner_id,
     amount,
     type,
@@ -426,7 +420,7 @@ def create_topup_transaction(
 
 
 @db_connection_wrapper
-def upsert_operator(connection, operator: dict):
+def upsert_operator(connection: Connection, operator: dict):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         keys = [
             key for key in operator.keys() if key not in ["created_at", "updated_at"]
@@ -452,7 +446,7 @@ def get_operators(connection: Connection, owner_id: str):
 
 @db_connection_wrapper
 def get_number_of_operators_records_count(
-    connection, owner_id: str, operator_code: int
+    connection: Connection, owner_id: str, operator_code: int
 ):
     query = "SELECT COUNT(*) FROM record WHERE owner_id = %s AND operator_code = %s"
     params = (owner_id, operator_code)
@@ -467,7 +461,7 @@ def get_number_records(connection: Connection, owner_id: str):
 
 
 @db_connection_wrapper
-def get_operator_name_by_code(connection, owner_id: str, code: int):
+def get_operator_name_by_code(connection: Connection, owner_id: str, code: int):
     return select_one(
         connection,
         "SELECT name FROM operator_data WHERE owner_id = %s AND code = %s",
