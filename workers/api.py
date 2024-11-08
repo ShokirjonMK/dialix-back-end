@@ -35,6 +35,10 @@ checklist_prompt = """
             "Question content3": true or false, # true if asked, false if not asked
             "Question content4": true or false  # true if asked, false if not asked
         }
+        "feedback": "feedback is a string response. Questions in the checklsit have their corresponding weights.
+        it is still ok not to ask certain questions, but some questions related to company and product, or any other from the list
+        could be important. So you can mention this in the feedback. In general, following the feedback, operator should be able take their 
+        performance to the next level."
     }
 
     Here is the list of segments and their respective questions:
@@ -42,8 +46,6 @@ checklist_prompt = """
         "segment_title 1": ["Question content1", "Question content2"],
         "segment_title 2": ["Question content3", "Question content4"]
     }
-
-    Also, provide a feedback for the performance of the operator. What things they need to improve.
 """
 
 courses_list = [
@@ -71,7 +73,7 @@ general_prompt = """
     Here is a conversation between a customer and an operator. The customer is interested in buying an online IT course. The operator is trying to sell the course to the customer. The conversation is in Uzbek language. According to the conversation, answer the following questions and return in json format with the following:
     Response format: {
     "is_conversation_over": true or false,
-    "call_purpose": "Choose from: Ma'lumot olish, Pulni Qaytarish, Kurs sotib olish, Texnik muammo, To'lov masalasi, Dars sifati",
+    "call_purpose": "Clients call for a specific purpose. Sometimes, their purpose could be purchasing the product. Choose only one. Because each call has only one purpose. Clients call for the following purposes: Ma'lumot olish, Pulni Qaytarish, Kurs sotib olish, Texnik muammo, To'lov masalasi, Dars sifati",
     "sentiment_analysis_of_conversation": "positive" or "negative" or "neutral",
     "reason_for_conversation_sentiment": "Detailed explanation in Uzbek within 30 words. Provide clear improvement steps if negative sentiment.",
     "sentiment_analysis_of_operator": "positive" or "negative" or "neutral",
@@ -116,12 +118,17 @@ def general_checker(text, general_prompt, courses_list, checklist=None):
                 },
                 {"role": "user", "content": text},
             ],
+            temperature = 0.2
         )
 
         # Assuming the response structure has the corrected text in a specific field
         corrected_text = (
             response.get("choices", [{}])[0].get("message", {}).get("content", "")
         )
+        try:
+            corrected_text = corrected_text.strip().replace("`","'")
+        except:
+            print("corrected text failed")
         return corrected_text
 
     except Exception as e:
