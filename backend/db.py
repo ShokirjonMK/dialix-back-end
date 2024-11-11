@@ -119,7 +119,7 @@ def remove_record(connection: Connection, record_id: str, owner_id: str):
 
 @db_connection_wrapper
 def get_records_v1(
-    connection: Connection, owner_id: str, filter_params: t.Optional[dict] = None
+    connection: Connection, owner_id: str, filter_params: t.Optional[dict] = {}
 ):
     sql_query, query_params = get_records_sa(owner_id, **filter_params)
     return select_many(connection, sql_query, query_params)
@@ -309,7 +309,7 @@ def get_result_by_record_id(
     connection: Connection,
     record_id: str,
     owner_id: str,
-    filter_params: t.Optional[dict] = None,
+    filter_params: t.Optional[dict] = {},
 ):
     sql_query, query_params = get_results_by_record_id_sa(
         record_id, owner_id, **filter_params
