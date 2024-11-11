@@ -1,32 +1,20 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import select, exists
 
-from fastapi import HTTPException, status
-
 from backend.utils.auth import hashify
 from backend.database.models import Account
+from backend.utils.shortcuts import raise_400
 
 
 def create_user(db_session: Session, user_data: dict) -> Account:
     if user_exists(db_session, user_data["username"], user_data["email"]):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User already exists with these credentials",
-        )
+        return raise_400("User already exists with these credentials")
 
-    new_user = Account(
-        id=user_data["id"],
-        email=user_data["email"],
-        username=user_data["username"],
-        password=hashify(user_data["password"]),
-        role=user_data["role"],
-        company_name=user_data["company_name"],
-    )
+    hashed_password = hashify(user_data.pop("password"))
+    new_user = Account(password=hashed_password, **user_data)
 
     db_session.add(new_user)
     db_session.commit()
-
-    user_data.pop("password")
 
     return {"id": new_user.id, **user_data}
 

@@ -11,8 +11,7 @@ from backend.sockets import sio_app
 from backend.core.lifespan import lifespan_handler
 from backend.core.logging import configure_logging
 
-# TODO: implement exception handlers for sqlalchemy+fastapi
-# from backend.core.exceptions import register_exception_handlers
+from backend.core.exceptions import register_exception_handlers
 from backend.core.dependencies import DatabaseSessionDependency
 
 from backend.api import api_router
@@ -28,7 +27,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 application = FastAPI(lifespan=lifespan_handler)
 
 configure_logging()
-# register_exception_handlers(application)
+register_exception_handlers(application)
 
 application.mount("/ws/", app=sio_app)
 

@@ -7,9 +7,12 @@ from pydantic import (
     EmailStr,
     Field,
     StringConstraints,
-    root_validator,
     ConfigDict,
+    model_validator,
 )
+
+ListChecklistPayload = t.Dict[str, t.List[str]]
+CreateChecklistPayload = t.Union[t.List[str], t.Dict[str, t.List[str]]]
 
 
 class UserCreate(BaseModel):
@@ -25,9 +28,9 @@ class User(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    role: str
     username: str
     email: EmailStr
-    role: str
     company_name: str
     created_at: datetime
     updated_at: datetime
@@ -37,17 +40,21 @@ class UserPrivate(User):
     password: str
 
 
-class CheckList(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
-    title: str
-    payload: t.Union[t.List[str], t.Dict[str, t.List[str]]] = []
-    active: bool = False
-    deleted_at: str = ""
+class CheckListBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
-    @root_validator(pre=True)
-    def validate_payload(cls, values):
+    id: UUID
+    title: str
+    active: bool = False
+
+
+class CheckListCreate(CheckListBase):
+    payload: CreateChecklistPayload
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_whether_segmented_or_not(cls, values: t.Any) -> t.Any:
         payload = values.get("payload")
-        # title = values.get("title")
 
         if isinstance(payload, list):
             values["payload"] = {"segment_1": payload}
@@ -60,6 +67,14 @@ class CheckList(BaseModel):
                     raise ValueError(f"Segment {key=} must be a list of strings")
 
         return values
+
+
+class CheckList(CheckListBase):
+    owner_id: UUID
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: t.Optional[datetime]
+    payload: ListChecklistPayload
 
 
 class CheckListUpdate(BaseModel):
@@ -83,7 +98,7 @@ class Record(BaseModel):
     storage_id: str
     created_at: datetime
     updated_at: datetime
-    deleted_at: datetime = None
+    deleted_at: t.Optional[datetime] = None
 
 
 class ReprocessRecord(BaseModel):
@@ -96,7 +111,7 @@ class OperatorData(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     code: int
     name: str
-    deleted_at: datetime = None
+    deleted_at: t.Optional[datetime] = None
 
 
 class PBXCallHistoryRequest(BaseModel):
