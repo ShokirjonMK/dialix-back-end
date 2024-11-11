@@ -1,5 +1,5 @@
 before_script:
-  - docker login $CI_REGISTRY --username $CI_REGISTRY_USER --password $CI_REGISTRY_PASSWORD
+  - docker login $CI_REGISTRY --username $DEPLOY_TOKEN_USERNAME --password $DEPLOY_TOKEN_PASSWORD
 
 stages:
   - build
@@ -10,7 +10,7 @@ build_image:
   image: registry.gitlab.com/dialix1/dialix-back-end:docker
   before_script:
     - apk update && apk add git
-    - docker login $CI_REGISTRY --username $CI_REGISTRY_USER --password $CI_REGISTRY_PASSWORD
+    - docker login $CI_REGISTRY --username $DEPLOY_TOKEN_USERNAME --password $DEPLOY_TOKEN_PASSWORD
     - eval $(ssh-agent -s)
     - echo "$GITLAB_PRIVATE_KEY" | tr -d '\r' | ssh-add -
     - mkdir -p ~/.ssh
