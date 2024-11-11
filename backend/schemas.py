@@ -11,8 +11,7 @@ from pydantic import (
     model_validator,
 )
 
-ListChecklistPayload = t.Dict[str, t.List[str]]
-CreateChecklistPayload = t.Union[t.List[str], t.Dict[str, t.List[str]]]
+ChecklistPayload = t.Union[t.List[str], t.Dict[str, t.List[str]]]
 
 
 class UserCreate(BaseModel):
@@ -49,7 +48,7 @@ class CheckListBase(BaseModel):
 
 
 class CheckListCreate(CheckListBase):
-    payload: CreateChecklistPayload
+    payload: ChecklistPayload
 
     @model_validator(mode="before")
     @classmethod
@@ -74,7 +73,7 @@ class CheckList(CheckListBase):
     created_at: datetime
     updated_at: datetime
     deleted_at: t.Optional[datetime]
-    payload: ListChecklistPayload
+    payload: ChecklistPayload
 
 
 class CheckListUpdate(BaseModel):
