@@ -100,34 +100,29 @@ openai.api_version = config("OPENAI_API_VERSION")
 
 
 def make_gpt_request(deployment_name: str, prompt: str, text: str) -> str:
+    response = openai.ChatCompletion.create(
+        deployment_id=deployment_name,
+        messages=[
+            {
+                "role": "system",
+                "content": prompt,
+            },
+            {"role": "user", "content": text},
+        ],
+        temperature=0.2,
+    )
+
+    corrected_text: str = (
+        response.get("choices", [{}])[0].get("message", {}).get("content", "")
+    )
+
     try:
-        response = openai.ChatCompletion.create(
-            deployment_id=deployment_name,
-            messages=[
-                {
-                    "role": "system",
-                    "content": prompt,
-                },
-                {"role": "user", "content": text},
-            ],
-            temperature=0.2,
-        )
-
-        corrected_text: str = (
-            response.get("choices", [{}])[0].get("message", {}).get("content", "")
-        )
-
-        try:
-            corrected_text = corrected_text.strip().replace("`", "'")
-        except Exception as exc:
-            logging.error(f"Failed to correct text: {corrected_text=} {exc=}")
-            raise exc
-
-        return corrected_text
-
+        corrected_text = corrected_text.strip().replace("`", "'")
     except Exception as exc:
-        logging.error(f"An unexpected error occurred: {exc}")
+        logging.error(f"Failed to correct text: {corrected_text=} {exc=}")
         raise exc
+
+    return corrected_text
 
 
 def general_checker(
@@ -146,7 +141,8 @@ def general_checker(
         try:
             corrected_text = make_gpt_request(deployment_name, prompt, text)
             return corrected_text
-        except openai.error.RateLimitError:
+        except openai.error.RateLimitError as exc:
+            logging.info(f"Rate limit exc: {exc=} {backoff_time=}")
             time.sleep(backoff_time)
             backoff_time = min(backoff_time * 2, 60)
 
