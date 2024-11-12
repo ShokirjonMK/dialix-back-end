@@ -1,10 +1,12 @@
-import json
-import logging
 import os
+import json
+import time
+import logging
 
 import openai
 
 from decouple import config
+import openai.error
 
 from utils.storage import download_file, file_exists
 from workers.common import celery, PredictTask
@@ -89,6 +91,7 @@ general_prompt = """
 }
 
 """
+deployment_name: str = config("DEPLOYMENT_NAME", default="gpt4")
 
 openai.api_key = config("OPENAI_API_KEY")
 openai.api_base = config("OPENAI_API_BASE")
@@ -96,14 +99,7 @@ openai.api_type = config("OPENAI_API_TYPE")
 openai.api_version = config("OPENAI_API_VERSION")
 
 
-def general_checker(text, general_prompt, courses_list, checklist=None):
-    if checklist:
-        prompt = checklist_prompt + "\n".join(checklist)
-    else:
-        prompt = general_prompt.replace("[courses_list]", str(courses_list))
-
-    deployment_name = config("DEPLOYMENT_NAME", default="gpt4")
-
+def make_gpt_request(deployment_name: str, prompt: str, text: str) -> str:
     try:
         response = openai.ChatCompletion.create(
             deployment_id=deployment_name,
@@ -117,19 +113,42 @@ def general_checker(text, general_prompt, courses_list, checklist=None):
             temperature=0.2,
         )
 
-        # Assuming the response structure has the corrected text in a specific field
-        corrected_text = (
+        corrected_text: str = (
             response.get("choices", [{}])[0].get("message", {}).get("content", "")
         )
+
         try:
             corrected_text = corrected_text.strip().replace("`", "'")
-        except:
-            print("corrected text failed")
+        except Exception as exc:
+            logging.error(f"Failed to correct text: {corrected_text=} {exc=}")
+            raise exc
+
         return corrected_text
 
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        raise e
+    except Exception as exc:
+        logging.error(f"An unexpected error occurred: {exc}")
+        raise exc
+
+
+def general_checker(
+    text: str, general_prompt: str, courses_list, checklist=None
+) -> str:
+    global deployment_name
+
+    backoff_time: int = 1
+
+    if checklist:
+        prompt = checklist_prompt + "\n".join(checklist)
+    else:
+        prompt = general_prompt.replace("[courses_list]", str(courses_list))
+
+    while True:
+        try:
+            corrected_text = make_gpt_request(deployment_name, prompt, text)
+            return corrected_text
+        except openai.error.RateLimitError:
+            time.sleep(backoff_time)
+            backoff_time = min(backoff_time * 2, 60)
 
 
 @celery.task(base=PredictTask, track_started=True, name="api", bind=True)
