@@ -35,10 +35,6 @@ checklist_prompt = """
             "Question content3": true or false, # true if asked, false if not asked
             "Question content4": true or false  # true if asked, false if not asked
         }
-        "feedback": "feedback is a string response. Questions in the checklsit have their corresponding weights.
-        it is still ok not to ask certain questions, but some questions related to company and product, or any other from the list
-        could be important. So you can mention this in the feedback. In general, following the feedback, operator should be able take their 
-        performance to the next level."
     }
 
     Here is the list of segments and their respective questions:
