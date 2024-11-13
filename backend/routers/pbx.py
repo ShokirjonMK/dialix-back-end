@@ -17,12 +17,18 @@ from backend.utils.pbx import (
     paginate_response,
     filter_calls,
 )
+from backend.services.operator import create_operators
+from backend.core.dependencies import DatabaseSessionDependency
 
 pbx_router = APIRouter(tags=["PBX Integration"])
 
 
 @pbx_router.post("/auth/{domain}")
-async def authenticate(domain: str, api_key: str):
+def authenticate(
+    domain: str,
+    api_key: str,
+    current_user: User = Depends(get_current_user),
+):
     url = f"{settings.PBX_API_URL.format(domain=domain)}/auth.json"
 
     try:
@@ -48,8 +54,13 @@ async def authenticate(domain: str, api_key: str):
         )
 
 
-@pbx_router.post("/users/{domain}")
-async def get_users(domain: str, key_id: str, key: str):
+@pbx_router.get("/pbx_operators/{domain}")
+def get_users(
+    domain: str,
+    key_id: str,
+    key: str,
+    current_user: User = Depends(get_current_user),
+):
     url = f"{settings.PBX_API_URL.format(domain=domain)}/user/get.json"
 
     try:
@@ -61,13 +72,60 @@ async def get_users(domain: str, key_id: str, key: str):
             },
         )
 
-        if response.status_code == status.HTTP_200_OK:
-            return JSONResponse(
-                status_code=response.status_code, content=response.json()
-            )
-        raise HTTPException(status_code=response.status_code, detail=response.text)
+        if response.json()["status"] != "1":
+            raise HTTPException(status_code=response.status_code, detail=response.text)
 
-    except requests.exceptions.RequestException as exc:
+        return JSONResponse(content=response.json(), status_code=status.HTTP_200_OK)
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching call history: {exc}",
+        )
+
+
+@pbx_router.post("/sync_operators/{domain}")
+def sync_operators(
+    db_session: DatabaseSessionDependency,
+    domain: str,
+    key_id: str,
+    key: str,
+    current_user: User = Depends(get_current_user),
+):
+    url = f"{settings.PBX_API_URL.format(domain=domain)}/user/get.json"
+
+    try:
+        response = requests.post(
+            url,
+            headers={
+                "x-pbx-authentication": f"{key_id}:{key}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+        )
+
+        if response.json()["status"] != "1":
+            raise HTTPException(status_code=response.status_code, detail=response.text)
+
+        operators_data: list[dict] = [
+            {
+                "name": operator.get("name"),
+                "code": int(operator.get("num")),
+                "owner_id": current_user.id,
+            }
+            for operator in response.json()["data"]
+            # if operator.get("enabled") # optional ...
+        ]
+
+        create_operators(db_session, operators_data)
+
+        return JSONResponse(
+            content={
+                "success": True,
+                "message": f"Total {len(operators_data)} were added",
+            },
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching call history: {exc}",
@@ -75,7 +133,12 @@ async def get_users(domain: str, key_id: str, key: str):
 
 
 @pbx_router.post("/groups/{domain}")
-def get_groups(domain: str, key_id: str, key: str):
+def get_groups(
+    domain: str,
+    key_id: str,
+    key: str,
+    current_user: User = Depends(get_current_user),
+):
     url = f"{settings.PBX_API_URL.format(domain=domain)}/group/get.json"
 
     try:
@@ -110,6 +173,7 @@ async def list_call_history(
     end_stamp_to: str,
     page_number: int,
     page_size: t.Optional[int] = 10,
+    current_user: User = Depends(get_current_user),
 ):
     logging.info("Preparing and sending request ...")
     url = f"{settings.PBX_API_URL.format(domain=domain)}/mongo_history/search.json"
