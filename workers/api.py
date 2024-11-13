@@ -38,12 +38,12 @@ checklist_prompt = """
             "Question 4": true or false  # true if asked, false if not asked
         }
     }
-
-    Here is the list of segments and their respective questions:
+    Request format for checklist would be:
     {
         "segment_title 1": ["Question 1", "Question 2"],
         "segment_title 2": ["Question 3", "Question 4"]
     }
+    Here is the list of real segments and their respective questions:
 """
 
 courses_list = [
@@ -131,9 +131,9 @@ def general_checker(
     global deployment_name
 
     backoff_time: int = 1
-    
+
     if checklist:
-        prompt = checklist_prompt + "\n".join(checklist)
+        prompt = checklist_prompt + "\n" + json.dumps(checklist)
     else:
         prompt = general_prompt.replace("[courses_list]", str(courses_list))
 
