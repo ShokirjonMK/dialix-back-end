@@ -30,19 +30,19 @@ checklist_prompt = """
     Response format:
     {
         "segment_title 1": {
-            "Question content1": true or false, # true if asked, false if not asked
-            "Question content2": true or false  # true if asked, false if not asked
+            "Question 1": true or false, # true if asked, false if not asked
+            "Question 2": true or false  # true if asked, false if not asked
         },
         "segment_title 2": {
-            "Question content3": true or false, # true if asked, false if not asked
-            "Question content4": true or false  # true if asked, false if not asked
+            "Question 3": true or false, # true if asked, false if not asked
+            "Question 4": true or false  # true if asked, false if not asked
         }
     }
 
     Here is the list of segments and their respective questions:
     {
-        "segment_title 1": ["Question content1", "Question content2"],
-        "segment_title 2": ["Question content3", "Question content4"]
+        "segment_title 1": ["Question 1", "Question 2"],
+        "segment_title 2": ["Question 3", "Question 4"]
     }
 """
 
@@ -109,7 +109,7 @@ def make_gpt_request(deployment_name: str, prompt: str, text: str) -> str:
             },
             {"role": "user", "content": text},
         ],
-        temperature=0.2,
+        temperature=0.7,
     )
 
     corrected_text: str = (
