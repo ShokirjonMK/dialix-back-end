@@ -133,7 +133,7 @@ def general_checker(
     backoff_time: int = 1
 
     if checklist:
-        prompt = checklist_prompt + "\n" + json.dumps(checklist_prompt)
+        prompt = checklist_prompt + "\n" + json.dumps(checklist)
     else:
         prompt = general_prompt.replace("[courses_list]", str(courses_list))
 
