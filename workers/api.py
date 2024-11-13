@@ -131,11 +131,13 @@ def general_checker(
     global deployment_name
 
     backoff_time: int = 1
-
+    
     if checklist:
         prompt = checklist_prompt + "\n".join(checklist)
     else:
         prompt = general_prompt.replace("[courses_list]", str(courses_list))
+
+    logging.info(f"Making request with {prompt=}")
 
     while True:
         try:
@@ -231,6 +233,9 @@ def api_processing(self: PredictTask, **kwargs):
         checklist = db.get_checklist_by_id(
             checklist_id, owner_id=str(record["owner_id"])
         )
+
+        logging.info(f"Checklist from db: {checklist=}")
+
         if checklist and checklist.get("payload"):
             checklist_response = general_checker(
                 conversation,
