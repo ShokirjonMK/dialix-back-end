@@ -234,7 +234,7 @@ def api_processing(self: PredictTask, **kwargs):
         if checklist and checklist.get("payload"):
             checklist_response = general_checker(
                 conversation,
-                general_prompt,
+                checklist_prompt,
                 courses_list,
                 checklist=checklist.get("payload"),
             )
