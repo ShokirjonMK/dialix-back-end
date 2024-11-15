@@ -1,11 +1,12 @@
-import os
 import logging
 import socketio
 from decouple import config
+
 from fastapi import HTTPException
-from backend.core import auth
+
 from http.cookies import SimpleCookie
 
+from backend.core import auth
 from backend.schemas import User
 from backend.database.session_manager import get_db_session
 from backend.utils.shortcuts import model_to_dict
