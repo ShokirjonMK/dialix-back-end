@@ -8,6 +8,7 @@ from http.cookies import SimpleCookie
 
 from backend.schemas import User
 from backend.database.session_manager import get_db_session
+from backend.utils.shortcuts import model_to_dict
 
 REDIS_URL: str = config("REDIS_URL")
 
@@ -40,19 +41,21 @@ async def connect(sid, environ):
         access_token = (
             cookie.get("access_token").value if "access_token" in cookie else None
         )
-        if access_token:
-            current_user = auth.get_current_user_websocket(
-                access_token, next(get_db_session())
-            )
-            user = User.model_validate(current_user).model_dump(mode="python")
+        logging.info(f"Socket endpoint: {access_token=}")
 
+        current_user = auth.get_current_user_websocket(
+            access_token, next(get_db_session())
+        )
+        if current_user:
+            user = model_to_dict(User, current_user, dump_mode="python")
             await sio_server.save_session(sid, {"user": user})
             await sio_server.enter_room(sid, f"user/{user['id']}")
         else:
             logging.warning(f"No access token provided for sid={sid}")
             await sio_server.disconnect(sid)
-    except HTTPException as e:
-        logging.warning(f"Failed to connect sid={sid} error={e}")
+
+    except HTTPException as exc:
+        logging.warning(f"Failed to connect {sid=} {exc=}")
         raise
 
 
