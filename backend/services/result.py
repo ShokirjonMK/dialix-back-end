@@ -23,7 +23,7 @@ def get_results_by_record_id_sa(  # sa -> SQLAlchemy
     call_purpose: t.Optional[str] = None,
 ):
     statement = (
-        select(Result, Checklist.title)
+        select(Result, Checklist.title.label("checklist_title"))
         .where((Result.owner_id == owner_id) & (Result.record_id == record_id))
         .join(Checklist, Result.checklist_id == Checklist.id)
     )
