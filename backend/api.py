@@ -141,7 +141,7 @@ async def process_form_data(request: Request, db_session: DatabaseSessionDepende
     processed_files = []
 
     for file, gen, chk in zip(files, general, checklist_id):
-        if not validate_filename(file.file):
+        if not validate_filename(file.filename):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Filename format is wrong. It should be like '23.10.04-05:08:37_102_933040598.mp3'",
