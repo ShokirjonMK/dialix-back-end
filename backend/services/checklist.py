@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend.database.models import Checklist
 
+
 def get_checklists_by_owner_id(db_session: Session, owner_id: UUID) -> list[Checklist]:
     return db_session.scalars(
         select(Checklist).where(Checklist.owner_id == owner_id)

@@ -1,7 +1,7 @@
 import typing as t
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, and_  # noqa: F401
 # from sqlalchemy.orm import Session
 
 from backend.database.models import Result
@@ -23,9 +23,9 @@ def get_results_by_record_id_sa(  # sa -> SQLAlchemy
     call_purpose: t.Optional[str] = None,
 ):
     statement = select(Result).where(
-        Result.owner_id == owner_id and Result.record_id == record_id
+        (Result.owner_id == owner_id) & (Result.record_id == record_id)
     )
-    
+
     if is_conversation_over:
         statement = statement.where(Result.is_conversation_over == is_conversation_over)
 
