@@ -63,5 +63,7 @@ async def connect(sid, environ):
 async def disconnect(sid):
     logging.warning("In the disconnect event")
     session = await sio_server.get_session(sid)
+    if session.get("user") is None:
+        return
     await sio_server.leave_room(sid, f"user/{session['user']['id']}")
     logging.warning(f"Disconnected sid={sid}")
