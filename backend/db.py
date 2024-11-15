@@ -26,36 +26,6 @@ CHECKLIST_PROMPT_PRICE_PER_MS: float = 360 / 60 / 1000 * 100
 
 
 @db_connection_wrapper
-def create_user(connection: Connection, user_data: dict):
-    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        cursor.execute(
-            """
-            INSERT INTO account (id, email, username, password, role, company_name, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
-            RETURNING id;
-            """,
-            (
-                str(user_data["id"]),
-                user_data["email"],
-                user_data["username"],
-                user_data["password"],
-                user_data["role"],
-                user_data["company_name"],
-            ),
-        )
-        user_id = cursor.fetchone()[0]
-        connection.commit()
-        return {**user_data, "id": user_id}
-
-
-@db_connection_wrapper
-def get_user_by_id(connection: Connection, user_id: str):
-    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        cursor.execute("SELECT * FROM account WHERE id = %s", (user_id,))
-        return cursor.fetchone()
-
-
-@db_connection_wrapper
 def get_user_by_email(connection: Connection, email: str):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         cursor.execute("SELECT * FROM account WHERE email = %s", (email,))
@@ -103,17 +73,6 @@ def get_record_by_id(connection: Connection, record_id: str, owner_id: str):
         "SELECT * FROM record WHERE id = %s AND owner_id = %s",
         (record_id, owner_id),
     )
-
-
-@db_connection_wrapper
-def remove_record(connection: Connection, record_id: str, owner_id: str):
-    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        cursor.execute(
-            "DELETE FROM record WHERE id = %s AND owner_id = %s",
-            (record_id, owner_id),
-        )
-        deleted_record = dict(cursor.fetchone())
-        return deleted_record if deleted_record else None
 
 
 @db_connection_wrapper
@@ -212,15 +171,6 @@ def update_checklist(connection: Connection, checklist_id: str, update_data: dic
 
 
 @db_connection_wrapper
-def get_checklists(connection: Connection, owner_id: str):
-    return select_many(
-        connection,
-        "SELECT * FROM checklist WHERE owner_id = %s",
-        (owner_id,),
-    )
-
-
-@db_connection_wrapper
 def get_checklist_by_id(connection: Connection, checklist_id: str, owner_id: str):
     return select_one(
         connection,
@@ -254,20 +204,6 @@ def get_active_checklist(connection: Connection, owner_id: str):
 
 
 @db_connection_wrapper
-def delete_checklist(connection: Connection, checklist_id: str, owner_id: str):
-    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        cursor.execute(
-            "DELETE FROM checklist WHERE id = %s AND owner_id = %s RETURNING *",
-            (checklist_id, owner_id),
-        )
-        deleted_checklist = cursor.fetchone()
-        if deleted_checklist:
-            return deleted_checklist
-        else:
-            return None
-
-
-@db_connection_wrapper
 def upsert_result(connection: Connection, result: dict):
     logging.info(f"Inserting result data: {result=}")
 
@@ -295,15 +231,6 @@ def upsert_result(connection: Connection, result: dict):
 
 
 @db_connection_wrapper
-def get_result_by_id(connection: Connection, result_id: str, owner_id: str):
-    return select_one(
-        connection,
-        "SELECT * FROM result WHERE id = %s AND owner_id = %s",
-        (result_id, owner_id),
-    )
-
-
-@db_connection_wrapper
 def get_result_by_record_id_v1(connection, record_id: str, owner_id: str):
     # without filter
     return select_one(
@@ -324,20 +251,6 @@ def get_result_by_record_id(
         record_id, owner_id, **filter_params
     )
     return select_one(connection, sql_query, query_params)
-
-
-@db_connection_wrapper
-def remove_result(connection: Connection, result_id: str, owner_id: str):
-    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        cursor.execute(
-            "DELETE FROM result WHERE id = %s AND owner_id = %s RETURNING *",
-            (result_id, owner_id),
-        )
-        deleted_result = cursor.fetchone()
-        if deleted_result:
-            return deleted_result
-        else:
-            return None
 
 
 @db_connection_wrapper

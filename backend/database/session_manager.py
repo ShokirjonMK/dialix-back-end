@@ -56,6 +56,6 @@ sessionmanager = DatabaseSessionManager(
 )
 
 
-def get_db_session():
+def get_db_session() -> t.Generator[Session, t.Any, None]:
     with sessionmanager.session() as session:
         yield session
