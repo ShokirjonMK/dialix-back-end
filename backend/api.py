@@ -31,10 +31,11 @@ from utils.data_manipulation import (
     find_call_type,
     get_phone_number_from_filename,
 )
-
 from workers.api import api_processing
 from workers.data import upsert_data
+from backend.utils.validators import validate_filename
 from backend.core.dependencies import DatabaseSessionDependency
+
 
 api_router = APIRouter()
 
@@ -140,6 +141,12 @@ async def process_form_data(request: Request, db_session: DatabaseSessionDepende
     processed_files = []
 
     for file, gen, chk in zip(files, general, checklist_id):
+        if not validate_filename(file.file):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Filename format is wrong. It should be like '23.10.04-05:08:37_102_933040598.mp3'",
+            )
+
         storage_id = get_object_storage_id(file.filename.split(".")[-1])
         file_path = os.path.join("uploads", storage_id)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
