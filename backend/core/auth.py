@@ -76,7 +76,7 @@ def get_current_user_websocket(
     except JWTError:
         return None
 
-    account = get_user_by_username(db_session, user_id)
+    account = get_user_by_id(db_session, user_id)
 
     if not account:
         return None
