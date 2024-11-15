@@ -1,91 +1,87 @@
-import json
 import logging
 from uuid import UUID
 from datetime import datetime
 
 from fastapi.responses import JSONResponse
-from fastapi import Depends, APIRouter, status, HTTPException
+from fastapi import Depends, APIRouter, status
 
 from backend import db
 from utils.encoder import adapt_json
 from backend.core.auth import get_current_user
-from backend.schemas import User, CheckList, CheckListUpdate
+from backend.schemas import User, CheckList, CheckListUpdate, CheckListCreate
+from backend.services.checklist import (
+    get_checklists_by_owner_id,
+    get_single_checklist,
+    insert_checklist,
+)
+from backend.core.dependencies import DatabaseSessionDependency
+from backend.utils.shortcuts import model_to_dict, models_to_dict, raise_404
 
 checklist_router = APIRouter(tags=["Checklist"])
 
 
 @checklist_router.get("/checklists")
-async def get_list_of_checklists(current_user: User = Depends(get_current_user)):
-    data = db.get_checklists(owner_id=str(current_user.id))
+def get_list_of_checklists(
+    db_session: DatabaseSessionDependency,
+    current_user: User = Depends(get_current_user),
+) -> JSONResponse:
+    checklists = get_checklists_by_owner_id(db_session, current_user.id)
 
-    for item in data:
-        if isinstance(item.get("payload"), str):
-            item["payload"] = json.loads(item["payload"])
+    if not checklists:
+        return checklists
 
-    data = adapt_json(data)
+    response_content = models_to_dict(CheckList, checklists)
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content=data)
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=response_content,
+    )
 
 
 @checklist_router.get("/checklists/{checklist_id}")
-async def retrieve_checklist(
-    checklist_id: UUID, current_user: User = Depends(get_current_user)
-):
-    data = db.get_checklist_by_id(str(checklist_id), owner_id=str(current_user.id))
+def retrieve_checklist(
+    db_session: DatabaseSessionDependency,
+    checklist_id: UUID,
+    current_user: User = Depends(get_current_user),
+) -> JSONResponse:
+    checklist = get_single_checklist(db_session, current_user.id, checklist_id)
 
-    if data is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Checklist is not found"
-        )
-    data = adapt_json(data)
+    if not checklist:
+        return raise_404("Checklist is not found")
 
-    if isinstance(data.get("payload"), str):
-        data["payload"] = json.loads(data["payload"])
+    response_content = model_to_dict(CheckList, checklist)
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content=data)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=response_content)
 
 
 @checklist_router.post("/checklist")
-async def create_checklist(
-    data: CheckList, current_user: User = Depends(get_current_user)
-):
-    logging.warning(f"Checklist data: {data}")
+def create_checklist(
+    db_session: DatabaseSessionDependency,
+    new_checklist: CheckListCreate,
+    current_user: User = Depends(get_current_user),
+) -> JSONResponse:
+    checklist = {"owner_id": current_user.id, **new_checklist.model_dump()}
 
-    deleted_at = (
-        datetime.fromisoformat(data.deleted_at.rstrip("Z")) if data.deleted_at else None
-    )
+    new_checklist = insert_checklist(db_session, checklist)
+    response_content = model_to_dict(CheckList, new_checklist)
 
-    checklist = {
-        "id": str(data.id),
-        "title": data.title,
-        "payload": json.dumps(data.payload),
-        "active": data.active,
-        "deleted_at": deleted_at,
-        "owner_id": str(current_user.id),
-    }
-
-    result = db.upsert_checklist(checklist=checklist)
-    logging.warning(f"Checklist result: {result}")
-
-    response = adapt_json(result)
-    return JSONResponse(status_code=status.HTTP_200_OK, content=response)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=response_content)
 
 
 @checklist_router.patch("/checklist/{checklist_id}")
-async def update_checklist(
+def update_checklist(
     checklist_id: str,
     data: CheckListUpdate,
     current_user: User = Depends(get_current_user),
 ):
     existing = db.get_checklist_by_id(checklist_id, owner_id=str(current_user.id))
+
     if not existing:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND, content={"error": "Not found"}
-        )
+        return raise_404("Checklist is not found")
 
     update_data = {
         "title": data.title or existing["title"],
-        "payload": json.dumps(data.payload) if data.payload else existing["payload"],
+        "payload": data.payload if data.payload else existing["payload"],
         "active": data.active if data.active is not None else existing["active"],
         "deleted_at": (
             datetime.fromisoformat(data.deleted_at.rstrip("Z"))
@@ -95,6 +91,7 @@ async def update_checklist(
     }
 
     result = db.update_checklist(checklist_id, update_data)
+
     if result:
         logging.warning(f"Updated checklist: {result}")
         response = adapt_json(result)
@@ -106,12 +103,12 @@ async def update_checklist(
 
 
 @checklist_router.post("/activate_checklist")
-async def activate_checklist(
+def activate_checklist(
     checklist_id: str, current_user: User = Depends(get_current_user)
 ):
     result = db.activate_checklist(checklist_id, owner_id=str(current_user.id))
+
     if result:
         return JSONResponse(status_code=status.HTTP_200_OK, content={"success": True})
-    return JSONResponse(
-        status_code=status.HTTP_404_NOT_FOUND, content={"error": "Not found"}
-    )
+
+    return raise_404("Checklist is not found")

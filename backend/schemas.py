@@ -2,7 +2,16 @@ import typing as t
 from uuid import UUID, uuid4
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, StringConstraints, root_validator
+from pydantic import (
+    BaseModel,
+    EmailStr,
+    Field,
+    StringConstraints,
+    ConfigDict,
+    model_validator,
+)
+
+ChecklistPayload = t.Union[t.List[str], t.Dict[str, t.List[str]]]
 
 
 class UserCreate(BaseModel):
@@ -15,30 +24,36 @@ class UserCreate(BaseModel):
 
 
 class User(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
-    username: str
-    password: str
-    email: EmailStr
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
     role: str
+    username: str
+    email: EmailStr
     company_name: str
     created_at: datetime
     updated_at: datetime
 
-    def hide_password(self):
-        return self.copy(exclude={"password": ...})
+
+class UserPrivate(User):
+    password: str
 
 
-class CheckList(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
+class CheckListBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
     title: str
-    payload: t.Union[t.List[str], t.Dict[str, t.List[str]]] = []
     active: bool = False
-    deleted_at: str = ""
 
-    @root_validator(pre=True)
-    def validate_payload(cls, values):
+
+class CheckListCreate(CheckListBase):
+    payload: ChecklistPayload
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_whether_segmented_or_not(cls, values: t.Any) -> t.Any:
         payload = values.get("payload")
-        # title = values.get("title")
 
         if isinstance(payload, list):
             values["payload"] = {"segment_1": payload}
@@ -51,6 +66,14 @@ class CheckList(BaseModel):
                     raise ValueError(f"Segment {key=} must be a list of strings")
 
         return values
+
+
+class CheckList(CheckListBase):
+    owner_id: UUID
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: t.Optional[datetime]
+    payload: ChecklistPayload
 
 
 class CheckListUpdate(BaseModel):
@@ -74,7 +97,7 @@ class Record(BaseModel):
     storage_id: str
     created_at: datetime
     updated_at: datetime
-    deleted_at: datetime = None
+    deleted_at: t.Optional[datetime] = None
 
 
 class ReprocessRecord(BaseModel):
@@ -87,7 +110,7 @@ class OperatorData(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     code: int
     name: str
-    deleted_at: datetime = None
+    deleted_at: t.Optional[datetime] = None
 
 
 class PBXCallHistoryRequest(BaseModel):
@@ -183,3 +206,25 @@ class PBXCallHistoryRequest(BaseModel):
     # accountcode: t.Optional[str] = Field(
     #     default=None, description="Account code for the call, e.g., 'ACC123456'"
     # )
+
+
+class RecordQueryParams(BaseModel):
+    duration: t.Optional[int] = None
+    operator_code: t.Union[str, int, None] = None
+    operator_name: t.Optional[str] = None
+    call_type: t.Optional[str] = None
+    call_status: t.Optional[str] = None
+    client_phone_number: t.Optional[str] = None
+
+
+class ResultQueryParams(BaseModel):
+    is_conversation_over: t.Optional[bool] = None
+    sentiment_analysis_of_conversation: t.Optional[str] = None
+    sentiment_analysis_of_operator: t.Optional[str] = None
+    sentiment_analysis_of_customer: t.Optional[str] = None
+    is_customer_satisfied: t.Optional[bool] = None
+    is_customer_agreed_to_buy: t.Optional[bool] = None
+    is_customer_interested_to_product: t.Optional[bool] = None
+    reason_for_customer_purchase: t.Optional[str] = None
+    which_platform_customer_found_about_the_course: t.Optional[str] = None
+    call_purpose: t.Optional[str] = None

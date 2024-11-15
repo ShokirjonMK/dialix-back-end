@@ -3,6 +3,7 @@ import uuid
 import math
 import shutil
 import logging
+import typing as t  # noqa: F401
 from decouple import config
 from datetime import datetime, timedelta
 from typing import List, Tuple, Union, Optional
@@ -14,28 +15,33 @@ from fastapi import Depends, UploadFile, Request, HTTPException, APIRouter, stat
 
 from backend import db
 from backend.core.auth import get_current_user
-from backend.schemas import User, ReprocessRecord, OperatorData
+from backend.schemas import (
+    User,
+    ReprocessRecord,
+    OperatorData,
+    RecordQueryParams,
+    ResultQueryParams,
+)
 
 from utils.storage import get_stream_url, upload_file
 from utils.audio import get_audio_duration
 from utils.encoder import adapt_json
-from utils.data_manipulation import find_operator_code, find_call_type
-
+from utils.data_manipulation import (
+    find_operator_code,
+    find_call_type,
+    get_phone_number_from_filename,
+)
 from workers.api import api_processing
 from workers.data import upsert_data
+from backend.utils.validators import validate_filename
+from backend.core.dependencies import DatabaseSessionDependency
 
 
 api_router = APIRouter()
 
-PBX_URL = "https://api.onlinepbx.ru/{domain}"
 
-MAX_FILE_SIZE_MB = 15
-SUPPORTED_FORMATS = [".mp3", ".wav", ".aac"]
-
-
-def get_task_id(user_id):
-    task_id = f"{user_id}/{uuid.uuid4()}"
-    return task_id
+def generate_task_id(user_id) -> str:
+    return f"{user_id}/{uuid.uuid4()}"
 
 
 def get_object_storage_id(extension):
@@ -122,10 +128,11 @@ def calculate_daily_satisfaction(data):
     }
 
 
-async def process_form_data(request: Request):
+async def process_form_data(request: Request, db_session: DatabaseSessionDependency):
     form = await request.form()
-    current_user = await get_current_user(request)
+    current_user = get_current_user(request, db_session)
     files = form.getlist("files")
+    logging.info(f"{files=}")
     general = [gen == "true" for gen in form.getlist("general")]
     checklist_id = [chk if chk else None for chk in form.getlist("checklist_id")]
     balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0)
@@ -134,6 +141,12 @@ async def process_form_data(request: Request):
     processed_files = []
 
     for file, gen, chk in zip(files, general, checklist_id):
+        if not validate_filename(file.filename):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Filename format is wrong. It should be like '23.10.04-05:08:37_102_933040598.mp3'",
+            )
+
         storage_id = get_object_storage_id(file.filename.split(".")[-1])
         file_path = os.path.join("uploads", storage_id)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -146,7 +159,8 @@ async def process_form_data(request: Request):
             if os.path.exists(file_path):
                 os.remove(file_path)
             return JSONResponse(
-                status_code=400, content={"error": "Invalid audio file"}
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": "Invalid audio file"},
             )
 
         processed_files.append(
@@ -165,28 +179,67 @@ async def process_form_data(request: Request):
         )
         total_price += mohirai_price + general_price + checklist_price
 
+    logging.info(f"Process form data: {total_price=} {balance=}")
+
     if total_price > balance:
         for file in processed_files:
             if os.path.exists(file["file_path"]):
                 os.remove(file["file_path"])
-        raise HTTPException(status_code=400, detail="Not enough balance")
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Not enough balance"
+        )
 
     if len(files) != len(general) or len(files) != len(checklist_id):
-        raise HTTPException(status_code=400, detail="Mismatched lengths of arrays.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Mismatched lengths of arrays.",
+        )
+
     return files, general, checklist_id, processed_files
 
 
 @api_router.get("/audios_results")
-async def get_audio_and_results(current_user: User = Depends(get_current_user)):
-    recordings = db.get_records_v1(owner_id=str(current_user.id))
+async def get_audio_and_results(
+    current_user: User = Depends(get_current_user),
+    record_query_params: RecordQueryParams = Depends(),
+    result_query_params: ResultQueryParams = Depends(),
+):
+    record_filter_params = record_query_params.model_dump(
+        mode="python", exclude_none=True
+    )
+    result_filter_params = result_query_params.model_dump(
+        mode="python", exclude_none=True
+    )
+    logging.info(f"{record_filter_params=} {result_filter_params=}")
+
+    recordings = db.get_records_v1(
+        owner_id=str(current_user.id), filter_params=record_filter_params
+    )
     recordings = adapt_json(recordings)
-    just_audios = []
-    audios_with_checklist = []
-    general_audios = []
+
     full_audios = []
+    just_audios = []
+    general_audios = []
+    audios_with_checklist = []
+
     folder_name = current_user.company_name.lower().replace(" ", "_")
+
     for record in recordings:
-        result = db.get_result_by_record_id(record["id"], owner_id=str(current_user.id))
+        result = db.get_result_by_record_id(
+            record["id"],
+            owner_id=str(current_user.id),
+            filter_params=result_filter_params,
+        )
+        logging.info(f"{result=} for {record=}")
+
+        if result_filter_params:
+            if result is None:
+                """if filters are being applied, and 
+                results is NONE then
+                we don't include this recording
+                """
+                continue
+
         audio_url = get_stream_url(f"{folder_name}/{record['storage_id']}")
         record["audio_url"] = audio_url
 
@@ -205,6 +258,7 @@ async def get_audio_and_results(current_user: User = Depends(get_current_user)):
         else:
             record["result"] = None
             just_audios.append(record)
+
     response = {
         "just_audios": just_audios,
         "audios_with_checklist": audios_with_checklist,
@@ -213,17 +267,14 @@ async def get_audio_and_results(current_user: User = Depends(get_current_user)):
         "recordings": recordings,
     }
 
-    return JSONResponse(status_code=200, content=response)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=response)
 
 
 @api_router.get("/v2/audios_results")
 async def get_audio_and_results_v2(current_user: User = Depends(get_current_user)):
-    recordings = db.get_records_v2(
-        owner_id=str(current_user.id)
-    )  # use v1 if you wanna offset stuff.
+    recordings = db.get_records_v2(owner_id=str(current_user.id))
 
     recordings = adapt_json(recordings)
-
     folder_name = current_user.company_name.lower().replace(" ", "_")
 
     for record in recordings:
@@ -255,10 +306,10 @@ async def get_audio_and_results_v2(current_user: User = Depends(get_current_user
 async def get_audio_file(request: Request, storage_id: str):
     # return url to audio file
     return JSONResponse(
-        status_code=200,
+        status_code=status.HTTP_200_OK,
         content={"url": f"{request.base_url}uploads/{storage_id}"},
     )
-    # return file itself
+    # or file itself
     # return FileResponse(f"uploads/{storage_id}")
 
 
@@ -269,7 +320,8 @@ async def analyze_data(
     ] = Depends(process_form_data),
     current_user: User = Depends(get_current_user),
     _operator_code: Optional[str] = None,  # for now, internal use only
-    _call_type: Optional[str] = None,
+    _call_type: Optional[str] = None,  # for now, internal use only
+    _destination_number: Optional[str] = None,  # for now, internal use only
 ):
     responses = []
 
@@ -293,14 +345,21 @@ async def analyze_data(
         folder_name = current_user.company_name.lower().replace(" ", "_")
 
         upload_file(bucket, f"{folder_name}/{storage_id}", file_path)
-        logging.warning(
+        logging.info(
             f"folder_name: {folder_name} storage_id: {storage_id}, bucket: {bucket}"
         )
-        task_id = get_task_id(user_id=current_user.id)
+        task_id = generate_task_id(user_id=current_user.id)
+
         operator_code = _operator_code or find_operator_code(file.filename)
         call_type = _call_type or find_call_type(file.filename)
+        client_phone_number = _destination_number or get_phone_number_from_filename(
+            file.filename
+        )
 
-        logging.info(f"{_operator_code=} {_call_type=} {operator_code=} {call_type=}")
+        logging.info(
+            f"Metadata: {_operator_code=} {_call_type=} {_destination_number=}"
+            f" => {operator_code=} {call_type=} {client_phone_number}"
+        )
 
         operator = (
             db.get_operator_name_by_code(owner_id=owner_id, code=operator_code) or {}
@@ -317,11 +376,10 @@ async def analyze_data(
             "status": status,
             "duration": duration * 1000,
             "storage_id": storage_id,
+            "client_phone_number": client_phone_number,
         }
 
-        audio_record = db.upsert_record(
-            record=record,
-        )
+        audio_record = db.upsert_record(record=record)
 
         logging.warning(
             f"Audio record: {audio_record} with id: {record_id} and owner_id: {current_user.id}"
@@ -430,7 +488,7 @@ async def reprocess_data(
     }
     db.upsert_record(record=record)
 
-    task_id = get_task_id(user_id=current_user.id)
+    task_id = generate_task_id(user_id=current_user.id)
 
     task: AsyncResult = api_processing.apply_async(
         kwargs={

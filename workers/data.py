@@ -45,7 +45,7 @@ def upsert_data(self: PredictTask, *args, **kwargs):
     loop = asyncio.get_event_loop()
 
     existing_record = db.get_record_by_id(record_id, owner_id)
-    existing_result = db.get_result_by_record_id(record_id, owner_id)
+    existing_result = db.get_result_by_record_id_v1(record_id, owner_id)
     existing_result_id = existing_result.get("id", None) if existing_result else None
     task_checklist_id = task.get("checklist_id", None)
     checklist_id = (
@@ -78,6 +78,12 @@ def upsert_data(self: PredictTask, *args, **kwargs):
         db.upsert_record(record={**existing_record, "status": "COMPLETED"})
 
         if isinstance(checklist_response, str):
+            logging.info(
+                "Checklist response: {}".format(
+                    checklist_response.strip("`").strip("json").strip("\n")
+                )
+            )
+
             checklist_response = json.loads(
                 checklist_response.strip("`").strip("json").strip("\n")
             )

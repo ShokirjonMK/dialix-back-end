@@ -1,10 +1,12 @@
-import json
-import logging
 import os
+import json
+import time
+import logging
 
 import openai
 
 from decouple import config
+import openai.error
 
 from utils.storage import download_file, file_exists
 from workers.common import celery, PredictTask
@@ -28,20 +30,20 @@ checklist_prompt = """
     Response format:
     {
         "segment_title 1": {
-            "Question content1": true or false, # true if asked, false if not asked
-            "Question content2": true or false  # true if asked, false if not asked
+            "Question 1": true or false, # true if asked, false if not asked
+            "Question 2": true or false  # true if asked, false if not asked
         },
         "segment_title 2": {
-            "Question content3": true or false, # true if asked, false if not asked
-            "Question content4": true or false  # true if asked, false if not asked
+            "Question 3": true or false, # true if asked, false if not asked
+            "Question 4": true or false  # true if asked, false if not asked
         }
     }
-
-    Here is the list of segments and their respective questions:
+    Request format for checklist would be:
     {
-        "segment_title 1": ["Question content1", "Question content2"],
-        "segment_title 2": ["Question content3", "Question content4"]
+        "segment_title 1": ["Question 1", "Question 2"],
+        "segment_title 2": ["Question 3", "Question 4"]
     }
+    Here is the list of real segments and their respective questions:
 """
 
 courses_list = [
@@ -62,24 +64,34 @@ courses_list = [
     ".NET dasturlash",
     "UX/UI Design",
     "Front-End dasturlash",
-    "English for I",
+    "English for IT",
 ]
 
 general_prompt = """
     Here is a conversation between a customer and an operator. The customer is interested in buying an online IT course. The operator is trying to sell the course to the customer. The conversation is in Uzbek language. According to the conversation, answer the following questions and return in json format with the following:
     Response format: {
-        "is_conversation_over": true or false,
-        "sentiment_analysis_of_conversation": "positive" or "negative" or "neutral",
-        "sentiment_analysis_of_operator": "positive" or "negative" or "neutral",
-        "sentiment_analysis_of_customer": "positive" or "negative" or "neutral",
-        "is_customer_satisfied": true or false,
-        "is_customer_agreed_to_buy": true or false,
-        "is_customer_interested_to_product": true or false,
-        "which_course_customer_interested": [courses_list] or None use correct course name if customer interested to product it might be multiple courses,
-        "summary": "The summary of the conversation in Uzbek language with punctuation corrected and aroun 20-30 words. Summarize as checker's discretion."
-        
-    }
+    "is_conversation_over": true or false,
+    "call_purpose": "Clients call for a specific purpose. Sometimes, their purpose could be purchasing the product. Choose only one. Because each call has only one purpose. Clients call for the following purposes: Ma'lumot olish, Pulni Qaytarish, Kurs sotib olish, Texnik muammo, To'lov masalasi, Dars sifati",
+    "sentiment_analysis_of_conversation": "positive" or "negative" or "neutral",
+    "reason_for_conversation_sentiment": "Detailed explanation in Uzbek within 30 words. Provide clear improvement steps if negative sentiment.",
+    "sentiment_analysis_of_operator": "positive" or "negative" or "neutral",
+    "reason_for_operator_sentiment": "Detailed explanation in Uzbek within 30 words. Provide clear improvement steps if negative sentiment.",
+    "list_of_words_define_operator_sentiment": ["word1", "word2", "word3", "word4", "word5"] or None,
+    "sentiment_analysis_of_customer": "positive" or "negative" or "neutral",
+    "reason_for_customer_sentiment": "Detailed explanation in Uzbek within 30 words. Provide clear improvement steps if negative sentiment.",
+    "list_of_words_define_customer_sentiment": ["word1", "word2", "word3", "word4", "word5"] or None,
+    "is_customer_satisfied": true or false,
+    "is_customer_agreed_to_buy": true or false,
+    "reason_for_customer_purchase": "Reason for decision in 50 words (flexible by a few words if needed).",
+    "is_customer_interested_to_product": true or false,
+    "how_old_is_customer": integer or None,
+    "which_course_customer_interested": ["course1", "course2"] or None,  // Use exact course names if available,
+    "which_platform_customer_found_about_the_course": "Facebook" or "Instagram" or "Telegram" or "Banners" or "Relatives" or "Friends" or None,
+    "summary": "Uzbek language summary, punctuated correctly, around 50 words."
+}
+
 """
+deployment_name: str = config("DEPLOYMENT_NAME", default="gpt4")
 
 openai.api_key = config("OPENAI_API_KEY")
 openai.api_base = config("OPENAI_API_BASE")
@@ -87,35 +99,54 @@ openai.api_type = config("OPENAI_API_TYPE")
 openai.api_version = config("OPENAI_API_VERSION")
 
 
-def general_checker(text, general_prompt, courses_list, checklist=None):
+def make_gpt_request(deployment_name: str, prompt: str, text: str) -> str:
+    response = openai.ChatCompletion.create(
+        deployment_id=deployment_name,
+        messages=[
+            {
+                "role": "system",
+                "content": prompt,
+            },
+            {"role": "user", "content": text},
+        ],
+        temperature=0.7,
+    )
+
+    corrected_text: str = (
+        response.get("choices", [{}])[0].get("message", {}).get("content", "")
+    )
+
+    try:
+        corrected_text = corrected_text.strip().replace("`", "'")
+    except Exception as exc:
+        logging.error(f"Failed to correct text: {corrected_text=} {exc=}")
+        raise exc
+
+    return corrected_text
+
+
+def general_checker(
+    text: str, general_prompt: str, courses_list, checklist=None
+) -> str:
+    global deployment_name
+
+    backoff_time: int = 1
+
     if checklist:
-        prompt = checklist_prompt + "\n".join(checklist)
+        prompt = checklist_prompt + "\n" + json.dumps(checklist)
     else:
         prompt = general_prompt.replace("[courses_list]", str(courses_list))
 
-    deployment_name = config("DEPLOYMENT_NAME", default="gpt4")
+    logging.info(f"Making request with {prompt=}")
 
-    try:
-        response = openai.ChatCompletion.create(
-            deployment_id=deployment_name,
-            messages=[
-                {
-                    "role": "system",
-                    "content": prompt,
-                },
-                {"role": "user", "content": text},
-            ],
-        )
-
-        # Assuming the response structure has the corrected text in a specific field
-        corrected_text = (
-            response.get("choices", [{}])[0].get("message", {}).get("content", "")
-        )
-        return corrected_text
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        raise e
+    while True:
+        try:
+            corrected_text = make_gpt_request(deployment_name, prompt, text)
+            return corrected_text
+        except openai.error.RateLimitError as exc:
+            logging.info(f"Rate limit exc: {exc=} {backoff_time=}")
+            time.sleep(backoff_time)
+            backoff_time = min(backoff_time * 2, 60)
 
 
 @celery.task(base=PredictTask, track_started=True, name="api", bind=True)
@@ -202,10 +233,13 @@ def api_processing(self: PredictTask, **kwargs):
         checklist = db.get_checklist_by_id(
             checklist_id, owner_id=str(record["owner_id"])
         )
+
+        logging.info(f"Checklist from db: {checklist=}")
+
         if checklist and checklist.get("payload"):
             checklist_response = general_checker(
                 conversation,
-                general_prompt,
+                checklist_prompt,
                 courses_list,
                 checklist=checklist.get("payload"),
             )
