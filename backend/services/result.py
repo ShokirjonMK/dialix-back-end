@@ -25,7 +25,7 @@ def get_results_by_record_id_sa(  # sa -> SQLAlchemy
     statement = select(Result).where(
         Result.owner_id == owner_id and Result.record_id == record_id
     )
-
+    
     if is_conversation_over:
         statement = statement.where(Result.is_conversation_over == is_conversation_over)
 

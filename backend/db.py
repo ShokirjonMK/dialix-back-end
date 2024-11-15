@@ -65,7 +65,6 @@ def get_user_by_email(connection: Connection, email: str):
 @db_connection_wrapper
 def get_balance(connection: Connection, owner_id: str):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        logging.info(f"{type(connection)=} {type(cursor)=}")
         cursor.execute(
             "SELECT SUM(amount) as sum FROM transaction WHERE owner_id = %s",
             (owner_id,),
@@ -301,6 +300,16 @@ def get_result_by_id(connection: Connection, result_id: str, owner_id: str):
         connection,
         "SELECT * FROM result WHERE id = %s AND owner_id = %s",
         (result_id, owner_id),
+    )
+
+
+@db_connection_wrapper
+def get_result_by_record_id_v1(connection, record_id: str, owner_id: str):
+    # without filter
+    return select_one(
+        connection,
+        "SELECT * FROM result WHERE record_id = %s AND owner_id = %s",
+        (record_id, owner_id),
     )
 
 
