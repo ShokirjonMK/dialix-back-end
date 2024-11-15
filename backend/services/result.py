@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy import select, and_  # noqa: F401
 # from sqlalchemy.orm import Session
 
-from backend.database.models import Result
+from backend.database.models import Result, Checklist
 from backend.database.utils import compile_sql_query_and_params
 
 
@@ -22,8 +22,10 @@ def get_results_by_record_id_sa(  # sa -> SQLAlchemy
     which_platform_customer_found_about_the_course: t.Optional[str] = None,
     call_purpose: t.Optional[str] = None,
 ):
-    statement = select(Result).where(
-        (Result.owner_id == owner_id) & (Result.record_id == record_id)
+    statement = (
+        select(Result, Checklist.title)
+        .where((Result.owner_id == owner_id) & (Result.record_id == record_id))
+        .join(Checklist, Result.checklist_id == Checklist.id)
     )
 
     if is_conversation_over:
