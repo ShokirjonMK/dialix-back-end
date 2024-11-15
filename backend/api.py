@@ -217,8 +217,6 @@ async def get_audio_and_results(
     )
     recordings = adapt_json(recordings)
 
-    logging.info(f"{recordings=}")
-
     full_audios = []
     just_audios = []
     general_audios = []
