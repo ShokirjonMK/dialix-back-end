@@ -210,6 +210,8 @@ async def get_audio_and_results(
     )
     recordings = adapt_json(recordings)
 
+    logging.info(f"{recordings=}")
+
     full_audios = []
     just_audios = []
     general_audios = []
@@ -223,10 +225,14 @@ async def get_audio_and_results(
             owner_id=str(current_user.id),
             filter_params=result_filter_params,
         )
+        logging.info(f"{result=} for {record=}")
+
         if result_filter_params:
             if result is None:
-                # if filters are being applied, and results is NONE then
-                # we don't include this recording
+                """if filters are being applied, and 
+                results is NONE then
+                we don't include this recording
+                """
                 continue
 
         audio_url = get_stream_url(f"{folder_name}/{record['storage_id']}")
