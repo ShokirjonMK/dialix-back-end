@@ -18,7 +18,6 @@ from backend.core.auth import get_current_user
 from backend.schemas import (
     User,
     ReprocessRecord,
-    OperatorData,
     RecordQueryParams,
     ResultQueryParams,
 )
@@ -604,32 +603,5 @@ async def results(current_user: User = Depends(get_current_user)):
 @api_router.get("/audios/pending")
 async def get_pending_audios(current_user: User = Depends(get_current_user)):
     data = db.get_pending_audios(owner_id=str(current_user.id))
-    data = adapt_json(data)
-    return JSONResponse(status_code=200, content=data)
-
-
-@api_router.post("/operator")
-async def upsert_operator(
-    data: OperatorData,
-    current_user: User = Depends(get_current_user),
-):
-    operator_code = data.code
-    operator_name = data.name
-    deleted_at = data.deleted_at
-    operator = {
-        "id": str(data.id),
-        "owner_id": str(current_user.id),
-        "code": int(operator_code),
-        "name": operator_name,
-        "deleted_at": deleted_at,
-    }
-    result = db.upsert_operator(operator=operator)
-    response = adapt_json(result)
-    return JSONResponse(status_code=200, content=response)
-
-
-@api_router.get("/operators")
-async def get_list_of_operators(current_user: User = Depends(get_current_user)):
-    data = db.get_operators(owner_id=str(current_user.id))
     data = adapt_json(data)
     return JSONResponse(status_code=200, content=data)
