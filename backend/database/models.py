@@ -70,7 +70,7 @@ class Transaction(Base):
 class Checklist(Base):
     __tablename__ = "checklist"
 
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True)
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
     owner_id = Column(
         PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
     )
