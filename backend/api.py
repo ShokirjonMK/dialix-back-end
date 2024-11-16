@@ -224,8 +224,6 @@ async def get_audio_and_results(
             owner_id=str(current_user.id),
             filter_params=result_filter_params,
         )
-        logging.info(f"{result=} for {record=}")
-
         if result_filter_params:
             if result is None:
                 """if filters are being applied, and 

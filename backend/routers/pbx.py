@@ -132,38 +132,6 @@ def sync_operators(
         )
 
 
-@pbx_router.post("/groups/{domain}")
-def get_groups(
-    domain: str,
-    key_id: str,
-    key: str,
-    current_user: User = Depends(get_current_user),
-):
-    url = f"{settings.PBX_API_URL.format(domain=domain)}/group/get.json"
-
-    try:
-        response = requests.post(
-            url,
-            headers={
-                "x-pbx-authentication": f"{key_id}:{key}",
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-        )
-
-        if response.status_code == status.HTTP_200_OK:
-            return JSONResponse(
-                status_code=response.status_code, content=response.json()
-            )
-        else:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
-
-    except requests.exceptions.RequestException as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching call history: {exc}",
-        )
-
-
 @pbx_router.get("/history/{domain}")
 async def list_call_history(
     domain: str,
