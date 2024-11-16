@@ -141,12 +141,6 @@ async def process_form_data(request: Request, db_session: DatabaseSessionDepende
     processed_files = []
 
     for file, gen, chk in zip(files, general, checklist_id):
-        if not validate_filename(file.filename):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Filename format is wrong. It should be like '23.10.04-05:08:37_102_933040598.mp3'",
-            )
-
         storage_id = get_object_storage_id(file.filename.split(".")[-1])
         file_path = os.path.join("uploads", storage_id)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -350,21 +344,31 @@ async def analyze_data(
         )
         task_id = generate_task_id(user_id=current_user.id)
 
-        operator_code = _operator_code or find_operator_code(file.filename)
-        call_type = _call_type or find_call_type(file.filename)
-        client_phone_number = _destination_number or get_phone_number_from_filename(
-            file.filename
+        is_filename_in_pbx_format: bool = validate_filename(file.filename)
+        operator_code = _operator_code or (
+            find_operator_code(file.filename) if is_filename_in_pbx_format else None
+        )
+        call_type = _call_type or (
+            find_call_type(file.filename) if is_filename_in_pbx_format else None
+        )
+        client_phone_number = _destination_number or (
+            get_phone_number_from_filename(file.filename)
+            if is_filename_in_pbx_format
+            else None
         )
 
         logging.info(
             f"Metadata: {_operator_code=} {_call_type=} {_destination_number=}"
             f" => {operator_code=} {call_type=} {client_phone_number}"
         )
+        operator_name: t.Optional[str] = None
 
-        operator = (
-            db.get_operator_name_by_code(owner_id=owner_id, code=operator_code) or {}
-        )
-        operator_name = operator.get("name", None)
+        if is_filename_in_pbx_format:
+            operator = (
+                db.get_operator_name_by_code(owner_id=owner_id, code=operator_code)
+                or {}
+            )
+            operator_name = operator.get("name", None)
 
         record = {
             "id": record_id,
