@@ -1,26 +1,13 @@
 import re
 import json
-import logging
+import logging  # noqa: F401
+
 
 PHONENUMBER_LENGTH: int = 9  # without +998
 
 
-def extract_specific_part(input_str):
-    # Pattern to match the desired format
-    pattern = r"\d{4}-\d{2}-\d{2}_\[\d{2}_\d{2}_\d{2}\]_\d+_\d+"
-
-    # Search for the pattern in the input string
-    match = re.search(pattern, input_str)
-
-    if match:
-        return match.group(0)  # Return the matched part of the string
-    else:
-        return ""  # Return an empty string if no match is found
-
-
 def convert_string_to_json(input_str):
     input_str = input_str.replace("None", "null")
-    logging.info(f"Converting string to json: {input_str=}")
 
     try:
         json_data = json.loads(input_str)
@@ -162,8 +149,8 @@ def find_position_from_filename(file_path):
         return 0, 1
 
 
-def find_operator_code(title):
-    parts = title.split("_")
+def find_operator_code(filename: str) -> str:
+    parts = filename.split("_")
 
     number_1 = parts[-1].split(".")[0]
     number_2 = parts[-2]
@@ -179,8 +166,8 @@ def find_operator_code(title):
     return operator_code
 
 
-def find_call_type(title):
-    parts = title.split("_")
+def find_call_type(filename: str) -> str:
+    parts = filename.split("_")
 
     number_1 = parts[-1].split(".")[0]
     number_2 = parts[-2]

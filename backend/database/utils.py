@@ -83,4 +83,5 @@ def compile_sql_query_and_params(
     statement: Select,
 ) -> tuple[str, dict]:  # most of the time
     sql_query = statement.compile(dialect=postgresql.dialect())
+    # logging.debug(f"Compiled sql_query={str(sql_query) % sql_query.params}")
     return str(sql_query), sql_query.params
