@@ -341,17 +341,11 @@ async def analyze_data(
         )
         task_id = generate_task_id(user_id=current_user.id)
 
-        is_filename_in_pbx_format: bool = validate_filename(file.filename)
-        operator_code = _operator_code or (
-            find_operator_code(file.filename) if is_filename_in_pbx_format else None
-        )
-        call_type = _call_type or (
-            find_call_type(file.filename) if is_filename_in_pbx_format else None
-        )
-        client_phone_number = _destination_number or (
-            get_phone_number_from_filename(file.filename)
-            if is_filename_in_pbx_format
-            else None
+        operator_code = _operator_code or find_operator_code(file.filename)
+        call_type = _call_type or find_call_type(file.filename)
+
+        client_phone_number = _destination_number or get_phone_number_from_filename(
+            file.filename
         )
 
         logging.info(
@@ -360,12 +354,12 @@ async def analyze_data(
         )
         operator_name: t.Optional[str] = None
 
-        if is_filename_in_pbx_format or operator_code is not None:
-            operator = (
-                db.get_operator_name_by_code(owner_id=owner_id, code=operator_code)
-                or {}
-            )
-            operator_name = operator.get("name", None)
+
+        operator = (
+            db.get_operator_name_by_code(owner_id=owner_id, code=operator_code)
+            or {}
+        )
+        operator_name = operator.get("name", None)
 
         record = {
             "id": record_id,
