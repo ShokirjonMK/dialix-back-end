@@ -15,6 +15,7 @@ def get_records_sa(  # sa -> SQLAlchemy
     call_type: t.Optional[str] = None,
     call_status: t.Optional[str] = None,
     client_phone_number: t.Optional[str] = None,
+    transcript_contains: t.Optional[str] = None,
 ):
     statement = select(Record).where(Record.owner_id == owner_id)
 
@@ -33,6 +34,11 @@ def get_records_sa(  # sa -> SQLAlchemy
     if client_phone_number:
         statement = statement.where(
             Record.client_phone_number.contains(client_phone_number)
+        )
+
+    if transcript_contains:
+        statement = statement.where(
+            Record.payload["result"].op("->>")("text").ilike(f"%{transcript_contains}%")
         )
 
     return compile_sql_query_and_params(statement)

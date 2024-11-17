@@ -18,7 +18,6 @@ from backend.core.auth import get_current_user
 from backend.schemas import (
     User,
     ReprocessRecord,
-    OperatorData,
     RecordQueryParams,
     ResultQueryParams,
 )
@@ -141,12 +140,6 @@ async def process_form_data(request: Request, db_session: DatabaseSessionDepende
     processed_files = []
 
     for file, gen, chk in zip(files, general, checklist_id):
-        if not validate_filename(file.filename):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Filename format is wrong. It should be like '23.10.04-05:08:37_102_933040598.mp3'",
-            )
-
         storage_id = get_object_storage_id(file.filename.split(".")[-1])
         file_path = os.path.join("uploads", storage_id)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -230,8 +223,6 @@ async def get_audio_and_results(
             owner_id=str(current_user.id),
             filter_params=result_filter_params,
         )
-        logging.info(f"{result=} for {record=}")
-
         if result_filter_params:
             if result is None:
                 """if filters are being applied, and 
@@ -352,6 +343,7 @@ async def analyze_data(
 
         operator_code = _operator_code or find_operator_code(file.filename)
         call_type = _call_type or find_call_type(file.filename)
+
         client_phone_number = _destination_number or get_phone_number_from_filename(
             file.filename
         )
@@ -360,9 +352,12 @@ async def analyze_data(
             f"Metadata: {_operator_code=} {_call_type=} {_destination_number=}"
             f" => {operator_code=} {call_type=} {client_phone_number}"
         )
+        operator_name: t.Optional[str] = None
+
 
         operator = (
-            db.get_operator_name_by_code(owner_id=owner_id, code=operator_code) or {}
+            db.get_operator_name_by_code(owner_id=owner_id, code=operator_code)
+            or {}
         )
         operator_name = operator.get("name", None)
 
@@ -602,32 +597,5 @@ async def results(current_user: User = Depends(get_current_user)):
 @api_router.get("/audios/pending")
 async def get_pending_audios(current_user: User = Depends(get_current_user)):
     data = db.get_pending_audios(owner_id=str(current_user.id))
-    data = adapt_json(data)
-    return JSONResponse(status_code=200, content=data)
-
-
-@api_router.post("/operator")
-async def upsert_operator(
-    data: OperatorData,
-    current_user: User = Depends(get_current_user),
-):
-    operator_code = data.code
-    operator_name = data.name
-    deleted_at = data.deleted_at
-    operator = {
-        "id": str(data.id),
-        "owner_id": str(current_user.id),
-        "code": int(operator_code),
-        "name": operator_name,
-        "deleted_at": deleted_at,
-    }
-    result = db.upsert_operator(operator=operator)
-    response = adapt_json(result)
-    return JSONResponse(status_code=200, content=response)
-
-
-@api_router.get("/operators")
-async def get_list_of_operators(current_user: User = Depends(get_current_user)):
-    data = db.get_operators(owner_id=str(current_user.id))
     data = adapt_json(data)
     return JSONResponse(status_code=200, content=data)

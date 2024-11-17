@@ -41,12 +41,12 @@ class Record(Base):
     title = Column(String, nullable=False)
     duration = Column(BigInteger)
     payload = Column(JSON)
-    operator_code = Column(String)
-    operator_name = Column(String)
-    call_type = Column(String)
+    operator_code = Column(String, nullable=True)
+    operator_name = Column(String, nullable=True)
+    call_type = Column(String, nullable=True)
     source = Column(String)
     status = Column(String)
-    client_phone_number = Column(String)
+    client_phone_number = Column(String, nullable=True)
     storage_id = Column(String)
     created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
     updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
@@ -70,7 +70,7 @@ class Transaction(Base):
 class Checklist(Base):
     __tablename__ = "checklist"
 
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True)
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
     owner_id = Column(
         PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
     )

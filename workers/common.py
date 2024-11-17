@@ -12,6 +12,8 @@ from celery import Celery
 
 from decouple import config
 
+from backend.utils.validators import validate_filename
+
 from librosa import LibrosaError
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Dropout
@@ -104,13 +106,15 @@ class PredictTask(Task):
             result = np.hstack((result, tonnetz))
         return result
 
-    def check_operator(self, audio_title):
-        # if file_path split with _ and first element is three digit number then it is operator number
-        file_name = audio_title.split("_")[-1].split(".")[0]
-        if len(file_name) == 3 and file_name.isdigit():
+    def check_operator(self, audio_title: str) -> bool:
+        # if file_path split with _ and first element is
+        # three digit number then it is operator number
+        filename_part = audio_title.split("_")[-1].split(".")[0]
+
+        if len(filename_part) == 3 and filename_part.isdigit():
             return False
-        else:
-            return True
+
+        return True
 
     def save_channel_one(self, file_path, audio_title):
         y, sr = librosa.load(file_path, mono=False)

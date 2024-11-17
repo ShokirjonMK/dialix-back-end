@@ -42,7 +42,6 @@ class UserPrivate(User):
 class CheckListBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID
     title: str
     active: bool = False
 
@@ -69,6 +68,7 @@ class CheckListCreate(CheckListBase):
 
 
 class CheckList(CheckListBase):
+    id: UUID
     owner_id: UUID
     created_at: datetime
     updated_at: datetime
@@ -106,11 +106,26 @@ class ReprocessRecord(BaseModel):
     general: bool = False
 
 
-class OperatorData(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
+class OperatorBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     code: int
     name: str
+
+
+class CreateOperatorData(OperatorBase): ...
+
+
+class ListOperatorData(OperatorBase):
+    id: UUID
+    owner_id: UUID
+    created_at: datetime
+    updated_at: datetime
     deleted_at: t.Optional[datetime] = None
+
+
+class UpdateOperatorData(BaseModel):
+    code: t.Optional[int] = None
+    name: t.Optional[str] = None
 
 
 class PBXCallHistoryRequest(BaseModel):
@@ -215,6 +230,7 @@ class RecordQueryParams(BaseModel):
     call_type: t.Optional[str] = None
     call_status: t.Optional[str] = None
     client_phone_number: t.Optional[str] = None
+    transcript_contains: t.Optional[str] = None
 
 
 class ResultQueryParams(BaseModel):

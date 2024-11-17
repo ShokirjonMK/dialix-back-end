@@ -17,6 +17,7 @@ from backend.core.dependencies import DatabaseSessionDependency
 from backend.api import api_router
 from backend.routers.pbx import pbx_router
 from backend.routers.user import user_router
+from backend.routers.operator import operator_router
 from backend.routers.checklist import checklist_router
 
 from backend.core import settings
@@ -35,7 +36,7 @@ application.mount("/ws/", app=sio_app)
 ###
 # Setup Routers
 ###
-ROUTERS = [user_router, checklist_router, pbx_router, api_router]
+ROUTERS = [user_router, checklist_router, pbx_router, api_router, operator_router]
 
 for router in ROUTERS:
     application.include_router(router)

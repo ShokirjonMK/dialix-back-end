@@ -8,12 +8,8 @@ from fastapi import Depends, APIRouter, status
 from backend import db
 from utils.encoder import adapt_json
 from backend.core.auth import get_current_user
+from backend.services import checklist as checklist_service
 from backend.schemas import User, CheckList, CheckListUpdate, CheckListCreate
-from backend.services.checklist import (
-    get_checklists_by_owner_id,
-    get_single_checklist,
-    insert_checklist,
-)
 from backend.core.dependencies import DatabaseSessionDependency
 from backend.utils.shortcuts import model_to_dict, models_to_dict, raise_404
 
@@ -25,7 +21,9 @@ def get_list_of_checklists(
     db_session: DatabaseSessionDependency,
     current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
-    checklists = get_checklists_by_owner_id(db_session, current_user.id)
+    checklists = checklist_service.get_checklists_by_owner_id(
+        db_session, current_user.id
+    )
 
     if not checklists:
         return checklists
@@ -44,10 +42,12 @@ def retrieve_checklist(
     checklist_id: UUID,
     current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
-    checklist = get_single_checklist(db_session, current_user.id, checklist_id)
+    checklist = checklist_service.get_single_checklist(
+        db_session, current_user.id, checklist_id
+    )
 
     if not checklist:
-        return raise_404("Checklist is not found")
+        raise_404("Checklist is not found")
 
     response_content = model_to_dict(CheckList, checklist)
 
@@ -60,9 +60,9 @@ def create_checklist(
     new_checklist: CheckListCreate,
     current_user: User = Depends(get_current_user),
 ) -> JSONResponse:
-    checklist = {"owner_id": current_user.id, **new_checklist.model_dump()}
-
-    new_checklist = insert_checklist(db_session, checklist)
+    new_checklist = checklist_service.create_checklist(
+        db_session, current_user.id, new_checklist.model_dump()
+    )
     response_content = model_to_dict(CheckList, new_checklist)
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=response_content)
@@ -77,7 +77,7 @@ def update_checklist(
     existing = db.get_checklist_by_id(checklist_id, owner_id=str(current_user.id))
 
     if not existing:
-        return raise_404("Checklist is not found")
+        raise_404("Checklist is not found")
 
     update_data = {
         "title": data.title or existing["title"],
@@ -108,7 +108,29 @@ def activate_checklist(
 ):
     result = db.activate_checklist(checklist_id, owner_id=str(current_user.id))
 
-    if result:
-        return JSONResponse(status_code=status.HTTP_200_OK, content={"success": True})
+    if not result:
+        raise_404("Checklist is not found")
 
-    return raise_404("Checklist is not found")
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"success": True})
+
+
+@checklist_router.delete("/checklist/{checklist_id}")
+def delete_operator(
+    db_session: DatabaseSessionDependency,
+    checklist_id: UUID,
+    current_user: User = Depends(get_current_user),
+):
+    was_checklist_deleted: bool = checklist_service.delete_checklist(
+        db_session, current_user.id, checklist_id
+    )
+
+    if not was_checklist_deleted:
+        raise_404(f"Checklist with {checklist_id} not found & was NOT deleted")
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "success": True,
+            "message": f"Checklist with {checklist_id} was deleted",
+        },
+    )
