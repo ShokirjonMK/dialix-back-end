@@ -9,12 +9,13 @@ from fastapi.security import HTTPBasicCredentials, OAuth2PasswordRequestForm
 from backend import db
 from backend.schemas import UserCreate, User
 from backend.utils.auth import add_to_blacklist
+from backend.utils.shortcuts import model_to_dict
 from backend.auth.basic import basic_auth_security, basic_auth_wrapper
-from backend.core.auth import generate_access_token, get_current_user, authenticate_user
+from backend.core.auth import generate_access_token, authenticate_user
 
 from backend.services.user import create_user
 
-from backend.core.dependencies import DatabaseSessionDependency
+from backend.core.dependencies import DatabaseSessionDependency, get_current_user
 
 user_router = APIRouter(tags=["User"])
 
@@ -26,10 +27,11 @@ def signup(
     db_session: DatabaseSessionDependency,
     credentials: HTTPBasicCredentials = Depends(basic_auth_security),
 ) -> JSONResponse:
-    registered_user = create_user(db_session, user.model_dump(mode="json"))
+    account = create_user(db_session, user.model_dump(mode="json"))
 
     return JSONResponse(
-        {"success": True, "user": registered_user}, status_code=status.HTTP_201_CREATED
+        {"success": True, "user": model_to_dict(User, account)},
+        status_code=status.HTTP_201_CREATED,
     )
 
 
