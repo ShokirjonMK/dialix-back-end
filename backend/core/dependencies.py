@@ -104,9 +104,7 @@ def get_pbx_credentials(
 
         logging.info(f"New {key=} and {key_id=}, updating pbx credentials on db")
 
-        update_pbx_credentials(
-            db_session, current_user.id, pbx_credentials.id, key, key_id
-        )
+        update_pbx_credentials(db_session, current_user.id, key, key_id)
 
         db_session.commit()
         logging.info(f"Refreshing {pbx_credentials=}")
@@ -118,9 +116,7 @@ def get_pbx_credentials(
         )
     ):
         logging.info("Updating pbx keys, they are not valid")
-        update_pbx_credentials(
-            db_session, current_user.id, pbx_credentials.id, None, None
-        )
+        update_pbx_credentials(db_session, current_user.id, None, None)
         raise_401("Pbx keys are not valid!")
 
     pbx_credentials_full = PbxCredentialsFull(
