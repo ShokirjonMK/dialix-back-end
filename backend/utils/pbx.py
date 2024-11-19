@@ -1,4 +1,4 @@
-import os
+import httpx
 import logging
 import tarfile
 import requests
@@ -7,23 +7,18 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
+from backend.core import settings
 
-def download_from(url: str, save_where: str) -> str:
-    try:
-        os.makedirs(os.path.dirname(save_where), exist_ok=True)
 
-        response = requests.get(url, stream=True)
-        response.raise_for_status()
-
-        with open(save_where, "wb") as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                file.write(chunk)
-        return save_where
-    except requests.exceptions.RequestException as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Couldn't download tarball: {exc}",
-        )
+async def download_from(url: str, file_path: str) -> str:
+    async with httpx.AsyncClient() as client:
+        async with client.stream("GET", url) as response:
+            response.raise_for_status()
+            with open(file_path, "wb") as file:
+                async for chunk in response.aiter_bytes():
+                    file.write(chunk)
+            logging.info(f"File downloaded successfully: {file_path}")
+    return file_path
 
 
 def extract_tar_file(tar_path: str, where: str) -> None:
@@ -37,32 +32,34 @@ def extract_tar_file(tar_path: str, where: str) -> None:
         )
 
 
-def get_call_info_by(uuid: UUID, url: str, key_id: str, key: str) -> dict:
-    response = requests.post(
-        url,
-        headers={
-            "x-pbx-authentication": f"{key_id}:{key}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        data={"uuid": uuid},
-    )
-    logging.info(f"Get call INFO: {response.status_code=} {response.json()=}")
-    response.raise_for_status()
-    return response.json()
+async def get_call_info_by(uuid: UUID, url: str, key_id: str, key: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            url,
+            headers={
+                "x-pbx-authentication": f"{key_id}:{key}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            data={"uuid": str(uuid)},
+        )
+        logging.info(f"Get call INFO: {response.status_code=} {response.json()=}")
+        response.raise_for_status()
+        return response.json()
 
 
-def get_call_download_url(data: dict, url: str, key_id: str, key: str) -> dict:
-    response = requests.post(
-        url,
-        headers={
-            "x-pbx-authentication": f"{key_id}:{key}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        data=data,
-    )
-    logging.info(f"Get download URL: {response.status_code=} {response.json()=}")
-    response.raise_for_status()
-    return response.json()
+async def get_call_download_url(data: dict, url: str, key_id: str, key: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            url,
+            headers={
+                "x-pbx-authentication": f"{key_id}:{key}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            data=data,
+        )
+        logging.info(f"Get download URL: {response.status_code=} {response.json()=}")
+        response.raise_for_status()
+        return response.json()
 
 
 def filter_calls(calls: list[dict]) -> list[dict]:
@@ -75,3 +72,59 @@ def paginate_response(
     return [
         array[index : index + page_size] for index in range(0, len(array), page_size)
     ][page_number]
+
+
+def test_pbx_credentials(domain: str, key: str, key_id: str) -> bool:
+    url = f"{settings.PBX_API_URL.format(domain=domain)}/user/get.json"
+
+    try:
+        response = requests.post(
+            url,
+            headers={
+                "x-pbx-authentication": f"{key_id}:{key}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+        )
+
+        if response.json()["status"] != "1":
+            logging.error(
+                f"Testing pbx credentials {domain=} {key=} {key_id=} failed: {response.json()=}"
+            )
+            return False
+
+        return True
+
+    except Exception as exc:
+        logging.info(
+            f"Testing pbx credentials {domain=} {key=} {key_id=} failed: {exc=}"
+        )
+        return False
+
+
+def get_pbx_keys(
+    domain: str, api_key: str
+) -> tuple[t.Union[str, None], t.Union[str, None]]:
+    url = f"{settings.PBX_API_URL.format(domain=domain)}/auth.json"
+
+    try:
+        response = requests.post(
+            url,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json",
+            },
+            data={"auth_key": api_key},
+        )
+
+        response_content = response.json()
+        if (
+            response.status_code == status.HTTP_200_OK
+            and response_content["status"] == "1"
+        ):
+            return response_content["data"]["key_id"], response_content["data"]["key"]
+
+        return None, None
+
+    except Exception as exc:
+        logging.info(f"Could not get pbx keys: {exc=}")
+        return None, None

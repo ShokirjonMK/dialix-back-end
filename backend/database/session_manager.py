@@ -54,8 +54,3 @@ class DatabaseSessionManager:
 sessionmanager = DatabaseSessionManager(
     settings.DATABASE_URL, {"echo": settings.ECHO_SQL}
 )
-
-
-def get_db_session() -> t.Generator[Session, t.Any, None]:
-    with sessionmanager.session() as session:
-        yield session

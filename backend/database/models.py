@@ -144,3 +144,29 @@ class OperatorData(Base):
         TIMESTAMP, nullable=False, server_default=text("now()"), onupdate=text("now()")
     )
     deleted_at = Column(TIMESTAMP, nullable=True)
+
+
+class PbxCredentials(Base):
+    __tablename__ = "pbx_credentials"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+
+    owner_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
+    )
+    api_key = Column(String, nullable=False)
+    domain = Column(String, unique=True, nullable=False)
+
+    key = Column(String, nullable=True, default=None)
+    key_id = Column(String, nullable=True, default=None)
+
+
+class BitrixCredentials(Base):
+    __tablename__ = "bitrix_credentials"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+
+    owner_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
+    )
+    webhook_url = Column(String, unique=True, nullable=False)

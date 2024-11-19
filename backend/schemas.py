@@ -14,6 +14,22 @@ from pydantic import (
 ChecklistPayload = t.Union[t.List[str], t.Dict[str, t.List[str]]]
 
 
+class PbxCredentials(BaseModel):
+    domain: str
+    api_key: str
+
+
+class PbxCredentialsFull(BaseModel):
+    domain: str
+
+    key: str
+    key_id: str
+
+
+class BitrixCredentials(BaseModel):
+    webhook_url: str
+
+
 class UserCreate(BaseModel):
     role: str
     password: str
@@ -21,6 +37,10 @@ class UserCreate(BaseModel):
     company_name: str
     id: UUID = Field(default_factory=uuid4)
     username: t.Annotated[str, StringConstraints(min_length=3, max_length=255)]
+
+    # optional credentials
+    pbx_credentials: t.Optional[PbxCredentials] = None
+    bitrix_credentials: t.Optional[BitrixCredentials] = None
 
 
 class User(BaseModel):
@@ -31,8 +51,8 @@ class User(BaseModel):
     username: str
     email: EmailStr
     company_name: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: t.Optional[datetime] = None
+    updated_at: t.Optional[datetime] = None
 
 
 class UserPrivate(User):

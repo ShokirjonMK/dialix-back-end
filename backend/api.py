@@ -14,7 +14,6 @@ from fastapi.responses import JSONResponse
 from fastapi import Depends, UploadFile, Request, HTTPException, APIRouter, status
 
 from backend import db
-from backend.core.auth import get_current_user
 from backend.schemas import (
     User,
     ReprocessRecord,
@@ -33,8 +32,7 @@ from utils.data_manipulation import (
 from workers.api import api_processing
 from workers.data import upsert_data
 from backend.utils.validators import validate_filename
-from backend.core.dependencies import DatabaseSessionDependency
-
+from backend.core.dependencies import DatabaseSessionDependency, get_current_user
 
 api_router = APIRouter()
 
@@ -341,25 +339,31 @@ async def analyze_data(
         )
         task_id = generate_task_id(user_id=current_user.id)
 
-        operator_code = _operator_code or find_operator_code(file.filename)
-        call_type = _call_type or find_call_type(file.filename)
+        is_filename_in_pbx_format: bool = validate_filename(file.filename)
 
-        client_phone_number = _destination_number or get_phone_number_from_filename(
-            file.filename
-        )
+        if is_filename_in_pbx_format:
+            operator_code = _operator_code or find_operator_code(file.filename)
+            call_type = _call_type or find_call_type(file.filename)
+            client_phone_number = _destination_number or get_phone_number_from_filename(
+                file.filename
+            )
+        else:
+            operator_code = None
+            call_type = None
+            client_phone_number = None
 
         logging.info(
-            f"Metadata: {_operator_code=} {_call_type=} {_destination_number=}"
+            f"Metadata: {is_filename_in_pbx_format=} {_operator_code=} {_call_type=} {_destination_number=}"
             f" => {operator_code=} {call_type=} {client_phone_number}"
         )
         operator_name: t.Optional[str] = None
 
-
-        operator = (
-            db.get_operator_name_by_code(owner_id=owner_id, code=operator_code)
-            or {}
-        )
-        operator_name = operator.get("name", None)
+        if is_filename_in_pbx_format:
+            operator = (
+                db.get_operator_name_by_code(owner_id=owner_id, code=operator_code)
+                or {}
+            )
+            operator_name = operator.get("name", None)
 
         record = {
             "id": record_id,
