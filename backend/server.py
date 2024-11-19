@@ -12,7 +12,6 @@ from backend.core.lifespan import lifespan_handler
 from backend.core.logging import configure_logging
 
 from backend.core.exceptions import register_exception_handlers
-from backend.core.dependencies import DatabaseSessionDependency
 
 from backend.api import api_router
 from backend.routers.pbx import pbx_router
@@ -41,6 +40,7 @@ ROUTERS = [user_router, checklist_router, pbx_router, api_router, operator_route
 for router in ROUTERS:
     application.include_router(router)
 
+
 ###
 # Tensorflow & NVIDIA Cuda
 ###
@@ -55,7 +55,7 @@ application.add_middleware(CORSMiddleware, **settings.CORS_SETTINGS)
 
 
 @application.get("/health")
-async def healthcheck(db_session: DatabaseSessionDependency):
+async def healthcheck():
     db_status = is_db_working()
 
     return JSONResponse(
