@@ -2,10 +2,6 @@ import asyncio
 import json
 import logging
 import os
-from psycopg2.extras import Json
-from celery import current_task
-
-import socketio
 
 from workers.common import celery, PredictTask
 import backend.db as db
