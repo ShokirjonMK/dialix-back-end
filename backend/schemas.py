@@ -20,14 +20,23 @@ class PbxCredentials(BaseModel):
 
 
 class PbxCredentialsFull(BaseModel):
-    domain: str
+    domain: t.Optional[str] = None
 
-    key: str
-    key_id: str
+    api_key: t.Optional[str] = None
+
+    key: t.Optional[str] = None
+    key_id: t.Optional[str] = None
 
 
 class BitrixCredentials(BaseModel):
     webhook_url: str
+
+
+class PutCredentials(BaseModel):
+    owner_id: UUID
+
+    pbx_credentials: t.Optional[PbxCredentialsFull] = None
+    bitrix_credentials: t.Optional[BitrixCredentials] = None
 
 
 class UserCreate(BaseModel):

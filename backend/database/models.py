@@ -152,7 +152,10 @@ class PbxCredentials(Base):
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
 
     owner_id = Column(
-        PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
+        PostgresUUID(as_uuid=True),
+        ForeignKey("account.id"),
+        nullable=False,
+        unique=True,
     )
     api_key = Column(String, nullable=False)
     domain = Column(String, unique=True, nullable=False)
@@ -167,6 +170,9 @@ class BitrixCredentials(Base):
     id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
 
     owner_id = Column(
-        PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
+        PostgresUUID(as_uuid=True),
+        ForeignKey("account.id"),
+        nullable=False,
+        unique=True,
     )
     webhook_url = Column(String, unique=True, nullable=False)

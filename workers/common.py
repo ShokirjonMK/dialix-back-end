@@ -109,7 +109,7 @@ class PredictTask(Task):
     def check_operator(self, audio_title: str) -> bool:
         if not validate_filename(audio_title):
             return True
-        
+
         # if file_path split with _ and first element is
         # three digit number then it is operator number
         filename_part = audio_title.split("_")[-1].split(".")[0]

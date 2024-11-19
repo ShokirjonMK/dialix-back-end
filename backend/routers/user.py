@@ -7,13 +7,17 @@ from fastapi import APIRouter, Depends, HTTPException, Body, status
 from fastapi.security import HTTPBasicCredentials, OAuth2PasswordRequestForm
 
 from backend import db
-from backend.schemas import UserCreate, User
 from backend.utils.auth import add_to_blacklist
-from backend.utils.shortcuts import model_to_dict
+from backend.utils.shortcuts import model_to_dict, raise_404
+from backend.schemas import UserCreate, User, PutCredentials
 from backend.auth.basic import basic_auth_security, basic_auth_wrapper
 from backend.core.auth import generate_access_token, authenticate_user
 
-from backend.services.user import create_user
+from backend.services.user import create_user, get_user_by_id
+from backend.services.credentials import (
+    insert_or_update_pbx_credential,
+    insert_or_update_bitrix_credential,
+)
 
 from backend.core.dependencies import DatabaseSessionDependency, get_current_user
 
@@ -123,3 +127,30 @@ def topup(
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST, content={"error": str(exc)}
         )
+
+
+@user_router.put("/put-credentials")
+@basic_auth_wrapper
+def put_credentials(
+    put_credentials: PutCredentials,
+    db_session: DatabaseSessionDependency,
+    credentials: HTTPBasicCredentials = Depends(basic_auth_security),
+) -> JSONResponse:
+    if not get_user_by_id(db_session, put_credentials.owner_id):
+        raise_404("Account with this owner_id is not found")
+
+    if put_credentials.pbx_credentials:
+        insert_or_update_pbx_credential(
+            db_session,
+            put_credentials.owner_id,
+            **put_credentials.model_dump()["pbx_credentials"],
+        )
+
+    if put_credentials.bitrix_credentials:
+        insert_or_update_bitrix_credential(
+            db_session,
+            put_credentials.owner_id,
+            **put_credentials.model_dump()["bitrix_credentials"],
+        )
+
+    return JSONResponse(content={"success": True}, status_code=status.HTTP_200_OK)
