@@ -1,0 +1,21 @@
+from fastapi import APIRouter
+
+from backend.api import api_router
+from backend.routers.pbx import pbx_router
+from backend.routers.user import user_router
+from backend.routers.bitrix import bitrix_router
+from backend.routers.operator import operator_router
+from backend.routers.checklist import checklist_router
+
+__all__ = ["routers"]
+
+routers: list[APIRouter] = [
+    # core
+    api_router,
+    user_router,
+    operator_router,
+    checklist_router,
+    # integrations
+    pbx_router,
+    bitrix_router,
+]
