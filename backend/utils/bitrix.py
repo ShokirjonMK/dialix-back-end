@@ -83,6 +83,7 @@ async def get_deals_by_contact_id(
             "select[1]": "TITLE",
             "select[2]": "STAGE_ID",
             "select[3]": "DATE_CREATE",
+            "select[4]": "CLOSEDATE",
         },
     )
     response.raise_for_status()
