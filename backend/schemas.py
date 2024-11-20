@@ -1,4 +1,4 @@
-import logging
+import logging  # noqa: F401
 
 import typing as t
 from uuid import UUID, uuid4
@@ -301,8 +301,6 @@ class FinalCallStatusResponse(BaseModel):
 
         @validator("status", pre=True, always=True)
         def strip_whitespace(cls, value: str) -> str:
-            logging.info(f"Validating status {value=}")
-
             if ":" in value:
                 for part in value.split(":"):
                     # don't worry about this nested loop
