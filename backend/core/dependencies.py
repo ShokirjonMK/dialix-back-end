@@ -61,6 +61,9 @@ def get_current_user(
     return account
 
 
+CurrentUser = t.Annotated[Account, Depends(get_current_user)]
+
+
 def get_current_user_websocket(
     token: str, db_session: DatabaseSessionDependency
 ) -> Account:

@@ -34,20 +34,6 @@ def update_pbx_credentials(
     db_session.commit()
 
 
-def update_bitrix_credential(
-    db_session: Session,
-    owner_id: UUID,
-    new_key: str,
-    new_key_id: str,
-) -> None:
-    db_session.execute(
-        update(PbxCredentials)
-        .where(PbxCredentials.owner_id == owner_id)
-        .values(key=new_key, key_id=new_key_id)
-    )
-    db_session.commit()
-
-
 def insert_or_update_pbx_credential(
     db_session: Session,
     owner_id: UUID,

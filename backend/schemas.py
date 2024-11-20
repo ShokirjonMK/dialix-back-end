@@ -1,14 +1,17 @@
+import logging
+
 import typing as t
 from uuid import UUID, uuid4
 from datetime import datetime
 
 from pydantic import (
-    BaseModel,
-    EmailStr,
     Field,
-    StringConstraints,
+    EmailStr,
+    BaseModel,
+    validator,
     ConfigDict,
     model_validator,
+    StringConstraints,
 )
 
 ChecklistPayload = t.Union[t.List[str], t.Dict[str, t.List[str]]]
@@ -273,3 +276,39 @@ class ResultQueryParams(BaseModel):
     reason_for_customer_purchase: t.Optional[str] = None
     which_platform_customer_found_about_the_course: t.Optional[str] = None
     call_purpose: t.Optional[str] = None
+
+
+class FinalCallStatusRequest(BaseModel):
+    client_phone_number: str
+
+    @validator("client_phone_number", pre=True, always=True)
+    def strip_whitespace(cls, value: str) -> str:
+        print(f"{value=}")
+        if isinstance(value, str):
+            return value.strip().replace(" ", "")
+        return value
+
+
+class FinalCallStatusResponse(BaseModel):
+    class Deal(BaseModel):
+        deal_id: str
+        title: str
+        status: str
+        date_created: datetime
+        date_closed: t.Optional[datetime]
+
+        @validator("status", pre=True, always=True)
+        def strip_whitespace(cls, value: str) -> str:
+            logging.info(f"Validating status {value=}")
+
+            if ":" in value:
+                for part in value.split(":"):
+                    # don't worry about this nested loop
+                    for status in ["win", "won", "lost", "lose"]:
+                        if status in part:
+                            return part
+
+            return value
+
+    client_name: str
+    deals: t.Optional[list[Deal]] = []
