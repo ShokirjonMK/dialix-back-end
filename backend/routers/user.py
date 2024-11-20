@@ -19,7 +19,11 @@ from backend.services.credentials import (
     insert_or_update_bitrix_credential,
 )
 
-from backend.core.dependencies import DatabaseSessionDependency, get_current_user
+from backend.core.dependencies import (
+    DatabaseSessionDependency,
+    get_current_user,
+    CurrentUser,
+)
 
 user_router = APIRouter(tags=["User"])
 
@@ -96,8 +100,8 @@ async def logout(
 
 
 @user_router.get("/me")
-def retrieve_current_user(current_user: User = Depends(get_current_user)):
-    return {"user": current_user}
+def retrieve_current_user(current_user: CurrentUser):
+    return {"user": model_to_dict(User, current_user)}
 
 
 @user_router.get("/balance")
