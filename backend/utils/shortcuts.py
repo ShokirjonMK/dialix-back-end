@@ -4,10 +4,15 @@ from fastapi import HTTPException, status
 
 
 def model_to_dict(
-    PydanticModel: BaseModel, object: t.Any, dump_mode: t.Optional[str] = "json"
+    PydanticModel: BaseModel,
+    object: t.Any,
+    dump_mode: t.Optional[str] = "json",
+    exclude: list = None,
 ) -> dict[str, t.Any]:
     # validates & converts sqlalchemy(or any orm stuff) to dictionary
-    return PydanticModel.model_validate(object).model_dump(mode=dump_mode)
+    return PydanticModel.model_validate(object).model_dump(
+        mode=dump_mode, exclude=exclude
+    )
 
 
 def models_to_dict(

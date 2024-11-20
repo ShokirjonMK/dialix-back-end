@@ -12,6 +12,7 @@ from pydantic import (
     ConfigDict,
     model_validator,
     StringConstraints,
+    SecretStr,
 )
 
 ChecklistPayload = t.Union[t.List[str], t.Dict[str, t.List[str]]]
@@ -44,9 +45,9 @@ class PutCredentials(BaseModel):
 
 class UserCreate(BaseModel):
     role: str
-    password: str
     email: EmailStr
     company_name: str
+    password: SecretStr
     id: UUID = Field(default_factory=uuid4)
     username: t.Annotated[str, StringConstraints(min_length=3, max_length=255)]
 
