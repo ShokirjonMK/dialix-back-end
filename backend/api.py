@@ -13,6 +13,10 @@ from celery.result import AsyncResult
 from fastapi.responses import JSONResponse
 from fastapi import Depends, UploadFile, Request, HTTPException, APIRouter, status
 
+import httpx
+
+from sqlalchemy.orm import Session
+
 from backend import db
 from backend.schemas import (
     User,
@@ -20,7 +24,6 @@ from backend.schemas import (
     RecordQueryParams,
     ResultQueryParams,
 )
-
 from utils.storage import get_stream_url, upload_file
 from utils.audio import get_audio_duration
 from utils.encoder import adapt_json
@@ -29,8 +32,12 @@ from utils.data_manipulation import (
     find_call_type,
     get_phone_number_from_filename,
 )
+
+from backend.core import settings
 from workers.api import api_processing
 from workers.data import upsert_data
+from backend.utils.pbx import filter_calls
+from backend.core.dependencies import get_pbx_credentials
 from backend.utils.validators import validate_filename
 from backend.core.dependencies import DatabaseSessionDependency, get_current_user
 
@@ -43,6 +50,45 @@ def generate_task_id(user_id) -> str:
 
 def get_object_storage_id(extension):
     return f"{uuid.uuid4()}.{extension}"
+
+
+async def get_pbx_call_history(
+    db_session: Session, current_user, start_stamp_from, end_stamp_to
+):
+    pbx_credentials = get_pbx_credentials(db_session, current_user)
+
+    logging.info("Preparing and sending request ...")
+    url = f"{settings.PBX_API_URL.format(domain=pbx_credentials.domain)}/mongo_history/search.json"
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            url,
+            headers={
+                "x-pbx-authentication": f"{pbx_credentials.key_id}:{pbx_credentials.key}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            data={
+                "start_stamp_from": start_stamp_from,
+                "end_stamp_to": end_stamp_to,
+            },
+            timeout=60,
+        )
+        logging.info(f"Response arrived: {response.status_code=}")
+
+        json_response = response.json()
+
+        if int(json_response["status"]) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=json_response["comment"],
+            )
+
+        logging.info(f"Total number of calls is {len(json_response['data'])}")
+
+        filtered_calls = filter_calls(json_response["data"])
+        logging.info(f"Number of filtered calls: {len(filtered_calls)}")
+
+        return filtered_calls
 
 
 def get_operators_data(owner_id):
@@ -191,9 +237,12 @@ async def process_form_data(request: Request, db_session: DatabaseSessionDepende
 
 @api_router.get("/audios_results")
 async def get_audio_and_results(
+    db_session: DatabaseSessionDependency,
     current_user: User = Depends(get_current_user),
     record_query_params: RecordQueryParams = Depends(),
     result_query_params: ResultQueryParams = Depends(),
+    start_stamp_from: t.Optional[str] = None,
+    end_stamp_to: t.Optional[str] = None,
 ):
     record_filter_params = record_query_params.model_dump(
         mode="python", exclude_none=True
@@ -255,6 +304,11 @@ async def get_audio_and_results(
         "full_audios": full_audios,
         "recordings": recordings,
     }
+
+    if start_stamp_from and end_stamp_to:
+        response["pbx_calls"] = await get_pbx_call_history(
+            db_session, current_user, start_stamp_from, end_stamp_to
+        )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=response)
 
