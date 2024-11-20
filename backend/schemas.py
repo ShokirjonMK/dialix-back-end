@@ -287,6 +287,7 @@ class FinalCallStatusRequest(BaseModel):
         print(f"{value=}")
         if isinstance(value, str):
             return value.strip().replace(" ", "")
+
         return value
 
 
