@@ -311,5 +311,5 @@ class FinalCallStatusResponse(BaseModel):
 
             return value
 
-    client_name: str
+    client_name: t.Optional[str] = None
     deals: t.Optional[list[Deal]] = []
