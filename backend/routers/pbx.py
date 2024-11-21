@@ -1,5 +1,6 @@
 import logging
 import typing as t  # noqa: F401
+from uuid import UUID
 
 import httpx
 from fastapi.responses import JSONResponse
@@ -13,6 +14,7 @@ from backend.schemas import User, PBXCallHistoryRequest
 from backend.utils.pbx import filter_calls
 
 from backend.services.operator import create_operators
+from backend.services.record import get_all_record_ids
 from backend.core.dependencies import (
     DatabaseSessionDependency,
     PbxCredentialsDependency,
@@ -101,49 +103,45 @@ async def sync_operators(
 
 @pbx_router.get("/history")
 async def list_call_history(
+    db_session: DatabaseSessionDependency,
     pbx_credentials: PbxCredentialsDependency,
     start_stamp_from: str,
     end_stamp_to: str,
+    current_user: User = Depends(get_current_user),
 ):
+    existing_record_ids: list[UUID] = get_all_record_ids(db_session, current_user.id)
+
     logging.info("Preparing and sending request ...")
     url = f"{settings.PBX_API_URL.format(domain=pbx_credentials.domain)}/mongo_history/search.json"
 
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                url,
-                headers={
-                    "x-pbx-authentication": f"{pbx_credentials.key_id}:{pbx_credentials.key}",
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                data={
-                    "start_stamp_from": start_stamp_from,
-                    "end_stamp_to": end_stamp_to,
-                },
-            )
-            logging.info(f"Response arrived: {response.status_code=}")
-
-        response.raise_for_status()
-        json_response = response.json()
-
-        if int(json_response["status"]) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=json_response["comment"],
-            )
-
-        logging.info(f"Total number of calls is {len(json_response['data'])}")
-
-        filtered_calls = filter_calls(json_response["data"])
-        logging.info(f"Number of filtered calls: {len(filtered_calls)}")
-
-        return JSONResponse(content=filtered_calls, status_code=status.HTTP_200_OK)
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching call history: {exc}",
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            url,
+            headers={
+                "x-pbx-authentication": f"{pbx_credentials.key_id}:{pbx_credentials.key}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            data={
+                "start_stamp_from": start_stamp_from,
+                "end_stamp_to": end_stamp_to,
+            },
+            timeout=60,
         )
+        logging.info(f"Response arrived: {response.status_code=}")
+
+    json_response = response.json()
+
+    if int(json_response["status"]) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=json_response["comment"],
+        )
+
+    logging.info(f"Total number of calls is {len(json_response['data'])}")
+    filtered_calls = filter_calls(json_response["data"], existing_record_ids)
+    logging.info(f"Filtering is done total number of calls={len(filtered_calls)}")
+
+    return JSONResponse(content=filtered_calls, status_code=status.HTTP_200_OK)
 
 
 @pbx_router.post("/history")

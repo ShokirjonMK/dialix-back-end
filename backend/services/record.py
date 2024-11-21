@@ -2,10 +2,22 @@ import typing as t
 from uuid import UUID
 
 from sqlalchemy import select
-# from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session
 
 from backend.database.models import Record
 from backend.database.utils import compile_sql_query_and_params
+
+
+def get_record_by_title(db_session: Session, owner_id: UUID, title: str) -> Record:
+    statement = select(Record).where(
+        (Record.owner_id == owner_id) & (Record.title.contains(title))
+    )
+    return db_session.scalar(statement)
+
+
+def get_all_record_ids(db_session: Session, owner_id: UUID):
+    statement = select(Record.id).where((Record.owner_id == owner_id))
+    return db_session.scalars(statement).all()
 
 
 def get_records_sa(  # sa -> SQLAlchemy
