@@ -15,8 +15,6 @@ from fastapi import Depends, UploadFile, Request, HTTPException, APIRouter, stat
 
 import httpx
 
-from sqlalchemy.orm import Session
-
 from backend import db
 from backend.schemas import (
     User,
@@ -37,7 +35,7 @@ from backend.core import settings
 from workers.api import api_processing
 from workers.data import upsert_data
 from backend.utils.pbx import filter_calls
-from backend.services.record import get_all_record_ids
+from backend.services.record import get_all_record_titles
 from backend.utils.validators import validate_filename
 from backend.core.dependencies import get_pbx_credentials
 from backend.core.dependencies import DatabaseSessionDependency, get_current_user
@@ -55,7 +53,7 @@ def get_object_storage_id(extension):
 
 def get_pbx_call_history(db_session, current_user, start_stamp_from, end_stamp_to):
     pbx_credentials = get_pbx_credentials(db_session, current_user)
-    existing_record_ids: list[uuid.UUID] = get_all_record_ids(
+    existing_record_titles: list[str] = get_all_record_titles(
         db_session, current_user.id
     )
 
@@ -86,7 +84,7 @@ def get_pbx_call_history(db_session, current_user, start_stamp_from, end_stamp_t
             )
 
         logging.info(f"Total number of calls is {len(json_response['data'])}")
-        filtered_calls = filter_calls(json_response["data"], existing_record_ids)
+        filtered_calls = filter_calls(json_response["data"], existing_record_titles)
         logging.info(f"Filtering is done total number of calls={len(filtered_calls)}")
 
         return filtered_calls

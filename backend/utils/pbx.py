@@ -126,11 +126,10 @@ def filter_calls(
     calls: list[dict], existing_record_ids: t.Optional[list[UUID]] = []
 ) -> list[dict]:
     logging.info(f"Filtering recordings: {len(calls)=} and {len(existing_record_ids)=}")
-    
     return list(
         filter(
             lambda entry: entry["user_talk_time"] != 0
-            and entry["id"] in existing_record_ids,
+            and f"call-{entry['uuid']}.mp3" not in existing_record_ids,
             calls,
         )
     )

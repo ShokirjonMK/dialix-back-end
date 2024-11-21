@@ -15,8 +15,8 @@ def get_record_by_title(db_session: Session, owner_id: UUID, title: str) -> Reco
     return db_session.scalar(statement)
 
 
-def get_all_record_ids(db_session: Session, owner_id: UUID):
-    statement = select(Record.id).where((Record.owner_id == owner_id))
+def get_all_record_titles(db_session: Session, owner_id: UUID):
+    statement = select(Record.title).where((Record.owner_id == owner_id))
     return db_session.scalars(statement).all()
 
 
