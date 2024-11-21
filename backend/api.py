@@ -395,15 +395,13 @@ def analyze_data(
         is_filename_in_pbx_format: bool = validate_filename(file.filename)
 
         if is_filename_in_pbx_format:
-            operator_code = _operator_code or find_operator_code(file.filename)
-            call_type = _call_type or find_call_type(file.filename)
-            client_phone_number = _destination_number or get_phone_number_from_filename(
-                file.filename
-            )
+            operator_code = find_operator_code(file.filename)
+            call_type = find_call_type(file.filename)
+            client_phone_number = get_phone_number_from_filename(file.filename)
         else:
-            operator_code = None
-            call_type = None
-            client_phone_number = None
+            operator_code = None or _operator_code
+            call_type = None or _call_type
+            client_phone_number = None or _destination_number
 
         logging.info(
             f"Metadata: {is_filename_in_pbx_format=} {_operator_code=} {_call_type=} {_destination_number=}"
