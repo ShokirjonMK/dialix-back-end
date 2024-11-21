@@ -1,26 +1,24 @@
 import logging
-import typing as t
+import typing as t  # noqa: F401
 
 import httpx
 from fastapi.responses import JSONResponse
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from celery.result import AsyncResult
 
 from backend.core import settings
-from backend.api import analyze_data
-
+from workers.common import celery as celery_app
 from backend.schemas import User, PBXCallHistoryRequest
-from backend.utils.pbx import (
-    download_from,
-    get_call_info_by,
-    get_call_download_url,
-    filter_calls,
-)
+from backend.utils.pbx import filter_calls
+
 from backend.services.operator import create_operators
 from backend.core.dependencies import (
     DatabaseSessionDependency,
     PbxCredentialsDependency,
     get_current_user,
 )
+from backend.tasks.pbx import process_pbx_call_task
 
 pbx_router = APIRouter(tags=["PBX Integration"])
 
@@ -154,65 +152,29 @@ async def process_from_call_history(
     pbx_credentials: PbxCredentialsDependency,
     current_user: User = Depends(get_current_user),
 ):
-    data = request.model_dump(exclude_none=True)
+    task = process_pbx_call_task.delay(
+        uuid=request.uuid,
+        checklist_id=request.checklist_id,
+        domain=pbx_credentials.domain,
+        key_id=pbx_credentials.key_id,
+        key=pbx_credentials.key,
+        user_id=current_user.id,
+    )
 
-    url = f"{settings.PBX_API_URL.format(domain=pbx_credentials.domain)}/mongo_history/search.json"
+    logging.info(f"Task {task} is routed to celery")
+    return {
+        "task_id": task.id,
+        "message": "Processing started. Check status using task_id.",
+    }
 
-    try:
-        call_info_response = await get_call_info_by(
-            request.uuid, url, pbx_credentials.key_id, pbx_credentials.key
-        )
-        if int(call_info_response["status"]) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=call_info_response["comment"],
-            )
 
-        call_info = call_info_response["data"][0]
-        download_url_response = await get_call_download_url(
-            data, url, pbx_credentials.key_id, pbx_credentials.key
-        )
-
-        if call_info["user_talk_time"] == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User did not say any word, and we need to analyze that?",
-            )
-
-        download_url = download_url_response.get("data")
-
-        filename = f"call-{request.uuid}.mp3"
-        download_file_path = f"./audios/{filename}"
-
-        downloaded_file = await download_from(download_url, download_file_path)
-        logging.info(f"Downloaded file path: {downloaded_file}")
-
-        with open(downloaded_file, "rb") as audio_file:
-            upload_file = UploadFile(audio_file, filename=filename)
-
-        processed_data = (
-            [upload_file],
-            [True],
-            [request.checklist_id],
-            [{"file_path": download_file_path, "duration": call_info["duration"]}],
-        )
-
-        logging.info(f"Preparing: {processed_data=}")
-
-        response = await analyze_data(
-            processed_data=processed_data,
-            current_user=current_user,
-            _operator_code=call_info["caller_id_number"],
-            _call_type=call_info["accountcode"],
-            _destination_number=call_info["destination_number"],
-        )
-
-        logging.info(f"Analysis endpoint's {response.status_code=} {response.body=}")
-
-        return response
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing call history: {exc}",
-        )
+@pbx_router.get("/history/status/{task_id}")
+async def get_task_status(task_id: str):
+    result = AsyncResult(task_id, app=celery_app)
+    if result.state == "PENDING":
+        return {"status": "Pending"}
+    elif result.state == "SUCCESS":
+        return {"status": "Success", "result": result.result}
+    elif result.state == "FAILURE":
+        return {"status": "Failure", "error": str(result.info)}
+    return {"status": result.state}

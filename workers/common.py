@@ -29,7 +29,8 @@ class PredictTask(Task):
         self.model, self.utils = torch.hub.load(
             repo_or_dir="snakers4/silero-vad",
             model="silero_vad",
-            force_reload=True,
+            force_reload=config("TORCH_FORCE_RELOAD", cast=bool, default=True),
+            trust_repo=True,
             onnx=self.USE_ONNX,
         )
         (
@@ -133,7 +134,7 @@ class PredictTask(Task):
             sf.write(new_file_path, data=channel_1, samplerate=sr)
 
             return new_file_path, duration
-        except:
+        except Exception as exc:
             return file_path, duration
 
     from typing import Callable, List
@@ -271,8 +272,8 @@ class PredictTask(Task):
             logging.error("Failed to extract feature: %s", str(e))
             result = {
                 "gender": "male",
-                "male_probability": f"100%",
-                "female_probability": f"0%",
+                "male_probability": "100%",
+                "female_probability": "0%",
                 "Time taken": "1 seconds",
                 "Audio length": "1 seconds",
             }
@@ -281,8 +282,8 @@ class PredictTask(Task):
             logging.error("Failed to classify gender: %s", str(e))
             result = {
                 "gender": "male",
-                "male_probability": f"100%",
-                "female_probability": f"0%",
+                "male_probability": "100%",
+                "female_probability": "0%",
                 "Time taken": "1 seconds",
                 "Audio length": "1 seconds",
             }
@@ -312,6 +313,7 @@ celery = Celery(
     "workers",
     broker=config("AMQP_URL", default="amqp://guest:guest@localhost:5672"),
     backend=config("REDIS_URL", default="redis://localhost:6380/0"),
+    include=["backend.tasks.pbx"],
 )
 
 celery.conf.update(
@@ -323,3 +325,8 @@ celery.conf.update(
 
 
 celery.task(base=PredictTask)
+
+
+celery.conf.task_routes = {
+    "backend.tasks.pbx.process_pbx_call_task": {"queue": "api"},
+}
