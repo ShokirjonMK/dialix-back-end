@@ -37,8 +37,9 @@ from backend.core import settings
 from workers.api import api_processing
 from workers.data import upsert_data
 from backend.utils.pbx import filter_calls
-from backend.core.dependencies import get_pbx_credentials
+from backend.services.record import get_all_record_ids
 from backend.utils.validators import validate_filename
+from backend.core.dependencies import get_pbx_credentials
 from backend.core.dependencies import DatabaseSessionDependency, get_current_user
 
 api_router = APIRouter()
@@ -54,6 +55,9 @@ def get_object_storage_id(extension):
 
 def get_pbx_call_history(db_session, current_user, start_stamp_from, end_stamp_to):
     pbx_credentials = get_pbx_credentials(db_session, current_user)
+    existing_record_ids: list[uuid.UUID] = get_all_record_ids(
+        db_session, current_user.id
+    )
 
     logging.info("Preparing and sending request ...")
     url = f"{settings.PBX_API_URL.format(domain=pbx_credentials.domain)}/mongo_history/search.json"
@@ -82,9 +86,8 @@ def get_pbx_call_history(db_session, current_user, start_stamp_from, end_stamp_t
             )
 
         logging.info(f"Total number of calls is {len(json_response['data'])}")
-
-        filtered_calls = filter_calls(json_response["data"])
-        logging.info(f"Number of filtered calls: {len(filtered_calls)}")
+        filtered_calls = filter_calls(json_response["data"], existing_record_ids)
+        logging.info(f"Filtering is done total number of calls={len(filtered_calls)}")
 
         return filtered_calls
 

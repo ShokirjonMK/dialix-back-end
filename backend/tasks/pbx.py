@@ -12,8 +12,8 @@ from backend.utils.pbx import (
     sync_get_call_info_by,
     sync_get_call_download_url,
 )
-from backend.core.dependencies import get_db_session
 from backend.services.user import get_user_by_id
+from backend.core.dependencies import get_db_session
 
 
 @celery_app.task

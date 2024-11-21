@@ -18,6 +18,13 @@ clear-image:
 push-image:
 	docker push ${REGISTRY}/${PROJECT_NAME}/${APP}:${TAG}
 	docker push ${REGISTRY}/${PROJECT_NAME}/${APP}:${ENV_TAG}
+
+# for local development
 run-local:
-	# .env file should exist. It loads(exports) everything from this file then runs backend
-	export $(cat .env | xargs) && gunicorn backend.server:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 127.0.0.1:8081 --reload
+	gunicorn backend.server:application --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 127.0.0.1:8081
+
+run-api-worker:
+	celery -A workers.api worker --loglevel=info -Q api -c 1
+
+run-data-worker:
+	celery -A workers.data data --loglevel=info -Q data -c 1
