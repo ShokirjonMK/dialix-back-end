@@ -1,3 +1,4 @@
+import os
 import httpx
 import logging
 import tarfile
@@ -71,7 +72,8 @@ def get_pbx_keys(
 def sync_download_from(url: str, file_path: str) -> str:
     with httpx.Client() as client:
         with client.stream("GET", url, timeout=120) as response:
-            response.raise_for_status()
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
             with open(file_path, "wb") as file:
                 for chunk in response.iter_bytes():
                     file.write(chunk)
