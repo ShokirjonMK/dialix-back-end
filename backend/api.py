@@ -52,16 +52,14 @@ def get_object_storage_id(extension):
     return f"{uuid.uuid4()}.{extension}"
 
 
-async def get_pbx_call_history(
-    db_session: Session, current_user, start_stamp_from, end_stamp_to
-):
+def get_pbx_call_history(db_session, current_user, start_stamp_from, end_stamp_to):
     pbx_credentials = get_pbx_credentials(db_session, current_user)
 
     logging.info("Preparing and sending request ...")
     url = f"{settings.PBX_API_URL.format(domain=pbx_credentials.domain)}/mongo_history/search.json"
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
+    with httpx.Client() as client:
+        response = client.post(
             url,
             headers={
                 "x-pbx-authentication": f"{pbx_credentials.key_id}:{pbx_credentials.key}",
@@ -171,8 +169,8 @@ def calculate_daily_satisfaction(data):
     }
 
 
-async def process_form_data(request: Request, db_session: DatabaseSessionDependency):
-    form = await request.form()
+def process_form_data(request: Request, db_session: DatabaseSessionDependency):
+    form = request.form()
     current_user = get_current_user(request, db_session)
     files = form.getlist("files")
     logging.info(f"{files=}")
@@ -306,7 +304,7 @@ async def get_audio_and_results(
     }
 
     if start_stamp_from and end_stamp_to:
-        response["pbx_calls"] = await get_pbx_call_history(
+        response["pbx_calls"] = get_pbx_call_history(
             db_session, current_user, start_stamp_from, end_stamp_to
         )
 
@@ -357,7 +355,7 @@ async def get_audio_file(request: Request, storage_id: str):
 
 
 @api_router.post("/audio", dependencies=[Depends(get_current_user)])
-async def analyze_data(
+def analyze_data(
     processed_data: Tuple[
         List[UploadFile], List[bool], List[Union[str, None]], List[dict]
     ] = Depends(process_form_data),

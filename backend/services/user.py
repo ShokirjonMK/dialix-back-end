@@ -64,5 +64,5 @@ def get_user_by_username(db_session: Session, username: str) -> Account:
     return db_session.scalar(select(Account).where(Account.username == username))
 
 
-def get_user_by_id(db_session: Session, user_id: str) -> Account:
+def get_user_by_id(db_session: Session, user_id: UUID) -> Account:
     return db_session.scalar(select(Account).where(Account.id == user_id))
