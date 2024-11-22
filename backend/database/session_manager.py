@@ -44,7 +44,7 @@ class DatabaseSessionManager:
         try:
             yield session
         except Exception as exc:
-            logging.info(f"Rolling back: {exc=}")
+            # logging.info(f"Rolling back: {exc=}")
             session.rollback()
             raise
         finally:
