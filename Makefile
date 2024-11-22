@@ -27,4 +27,4 @@ run-api-worker:
 	celery -A workers.api worker --loglevel=info -Q api -c 1
 
 run-data-worker:
-	celery -A workers.data data --loglevel=info -Q data -c 1
+	celery -A workers.data worker --loglevel=info -Q data -c 1
