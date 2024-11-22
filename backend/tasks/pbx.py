@@ -1,12 +1,13 @@
 import os
+
 import logging
 import typing as t  # noqa: F401
+
 
 from fastapi import UploadFile
 
 from backend.core import settings
 from workers.common import celery as celery_app
-from backend.api import analyze_data
 from backend.utils.pbx import (
     sync_download_from,
     sync_get_call_info_by,
@@ -14,6 +15,7 @@ from backend.utils.pbx import (
 )
 from backend.services.user import get_user_by_id
 from backend.core.dependencies import get_db_session
+from backend.utils.analyze import analyze_data_handler
 
 
 @celery_app.task
@@ -64,8 +66,11 @@ def process_pbx_call_task(*args, **kwargs):
                 [{"file_path": download_file_path, "duration": call_info["duration"]}],
             )
 
-            current_user = get_user_by_id(next(get_db_session()), user_id)
-            response = analyze_data(
+            db_session = next(get_db_session())
+            current_user = get_user_by_id(db_session, user_id)
+
+            response = analyze_data_handler(
+                db_session=db_session,
                 processed_data=processed_data,
                 current_user=current_user,
                 _operator_code=call_info["caller_id_number"],
@@ -76,6 +81,7 @@ def process_pbx_call_task(*args, **kwargs):
             logging.info(f"Analysis endpoint's response: {response}")
 
         return {"success": True, "response": response.status_code}
+
     finally:
         if os.path.exists(download_file_path):
             try:

@@ -4,9 +4,8 @@ import math
 import shutil
 import logging
 import typing as t  # noqa: F401
-from decouple import config
 from datetime import datetime, timedelta
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Union
 
 from celery.result import AsyncResult
 
@@ -22,21 +21,16 @@ from backend.schemas import (
     RecordQueryParams,
     ResultQueryParams,
 )
-from utils.storage import get_stream_url, upload_file
-from utils.audio import get_audio_duration
 from utils.encoder import adapt_json
-from utils.data_manipulation import (
-    find_operator_code,
-    find_call_type,
-    get_phone_number_from_filename,
-)
+from utils.storage import get_stream_url
+from utils.audio import get_audio_duration
 
 from backend.core import settings
 from workers.api import api_processing
 from workers.data import upsert_data
 from backend.utils.pbx import filter_calls
+from backend.utils.analyze import analyze_data_handler
 from backend.services.record import get_all_record_titles
-from backend.utils.validators import validate_filename
 from backend.core.dependencies import get_pbx_credentials
 from backend.core.dependencies import DatabaseSessionDependency, get_current_user
 
@@ -170,13 +164,14 @@ def calculate_daily_satisfaction(data):
     }
 
 
-def process_form_data(request: Request, db_session: DatabaseSessionDependency):
-    form = request.form()
+async def process_form_data(request: Request, db_session: DatabaseSessionDependency):
+    form_data = await request.form()
     current_user = get_current_user(request, db_session)
-    files = form.getlist("files")
+
+    files = form_data.getlist("files")
     logging.info(f"{files=}")
-    general = [gen == "true" for gen in form.getlist("general")]
-    checklist_id = [chk if chk else None for chk in form.getlist("checklist_id")]
+    general = [gen == "true" for gen in form_data.getlist("general")]
+    checklist_id = [chk if chk else None for chk in form_data.getlist("checklist_id")]
     balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0)
     balance = balance if balance is not None else 0
     total_price = 0
@@ -199,12 +194,7 @@ def process_form_data(request: Request, db_session: DatabaseSessionDependency):
                 content={"error": "Invalid audio file"},
             )
 
-        processed_files.append(
-            {
-                "file_path": file_path,
-                "duration": duration,
-            }
-        )
+        processed_files.append({"file_path": file_path, "duration": duration})
 
         mohirai_price = (
             duration * db.MOHIRAI_PRICE_PER_MS if gen is True or chk is not None else 0
@@ -356,150 +346,14 @@ async def get_audio_file(request: Request, storage_id: str):
 
 
 @api_router.post("/audio", dependencies=[Depends(get_current_user)])
-def analyze_data(
+async def analyze_data(
+    db_session: DatabaseSessionDependency,
     processed_data: Tuple[
         List[UploadFile], List[bool], List[Union[str, None]], List[dict]
     ] = Depends(process_form_data),
     current_user: User = Depends(get_current_user),
-    _operator_code: Optional[str] = None,  # for now, internal use only
-    _call_type: Optional[str] = None,  # for now, internal use only
-    _destination_number: Optional[str] = None,  # for now, internal use only
 ):
-    responses = []
-
-    files, general, checklist_id, processed_files = processed_data
-
-    logging.info(
-        f"Received request: {files=} {general=} {checklist_id=} {processed_files=}"
-    )
-
-    for file, general, checklist_id, processed_file in zip(
-        files, general, checklist_id, processed_files
-    ):
-        record_id = str(uuid.uuid4())
-        owner_id = str(current_user.id)
-        status = "UPLOADED" if general is False and checklist_id is None else "PENDING"
-        storage_id = processed_file["file_path"].split("/")[-1]
-        file_path = processed_file["file_path"]
-        duration = processed_file["duration"]
-        bucket = config("STORAGE_BUCKET_NAME", default="dialixai-production")
-
-        folder_name = current_user.company_name.lower().replace(" ", "_")
-
-        upload_file(bucket, f"{folder_name}/{storage_id}", file_path)
-        logging.info(
-            f"folder_name: {folder_name} storage_id: {storage_id}, bucket: {bucket}"
-        )
-        task_id = generate_task_id(user_id=current_user.id)
-
-        is_filename_in_pbx_format: bool = validate_filename(file.filename)
-
-        if is_filename_in_pbx_format:
-            operator_code = find_operator_code(file.filename)
-            call_type = find_call_type(file.filename)
-            client_phone_number = get_phone_number_from_filename(file.filename)
-        else:
-            operator_code = None or _operator_code
-            call_type = None or _call_type
-            client_phone_number = None or _destination_number
-
-        logging.info(
-            f"Metadata: {is_filename_in_pbx_format=} {_operator_code=} {_call_type=} {_destination_number=}"
-            f" => {operator_code=} {call_type=} {client_phone_number}"
-        )
-        operator_name: t.Optional[str] = None
-
-        if is_filename_in_pbx_format:
-            operator = (
-                db.get_operator_name_by_code(owner_id=owner_id, code=operator_code)
-                or {}
-            )
-            operator_name = operator.get("name", None)
-
-        record = {
-            "id": record_id,
-            "owner_id": owner_id,
-            "title": file.filename,
-            "operator_code": operator_code,
-            "operator_name": operator_name,
-            "call_type": call_type,
-            "status": status,
-            "duration": duration * 1000,
-            "storage_id": storage_id,
-            "client_phone_number": client_phone_number,
-        }
-
-        audio_record = db.upsert_record(record=record)
-
-        logging.warning(
-            f"Audio record: {audio_record} with id: {record_id} and owner_id: {current_user.id}"
-        )
-
-        # audio_local_path = f"uploads/transcode_{storage_id}.mp3"
-        # waveform_local_path = f"uploads/transcode_waveform_{storage_id}.dat"
-        # generate_waveform(audio_local_path, waveform_local_path)
-
-        if general is False and checklist_id is None:
-            responses.append(
-                {
-                    "id": task_id,
-                    "record_id": record_id,
-                    "record_title": file.filename,
-                    "status": status,
-                    "duration": duration * 1000,
-                    "storage_id": storage_id,
-                }
-            )
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            continue
-
-        task: AsyncResult = api_processing.apply_async(
-            kwargs={
-                "task": {
-                    "audio_record": audio_record,
-                    "checklist_id": checklist_id,
-                    "general": general,
-                    "folder_name": folder_name,
-                },
-            },
-            link=upsert_data.s(
-                task={
-                    "task_id": task_id,
-                    "owner_id": owner_id,
-                    "record_id": audio_record["id"],
-                    "checklist_id": checklist_id,
-                    "storage_id": audio_record["storage_id"],
-                    "is_success": True,
-                }
-            ).set(queue="data"),
-            link_error=upsert_data.s(
-                task={
-                    "task_id": task_id,
-                    "owner_id": owner_id,
-                    "record_id": audio_record["id"],
-                    "checklist_id": checklist_id,
-                    "storage_id": audio_record["storage_id"],
-                    "is_success": False,
-                }
-            ).set(queue="data"),
-            queue="api",
-            task_id=task_id,
-        )
-
-        responses.append(
-            {
-                "id": task.id,
-                "record_id": record_id,
-                "checklist_id": checklist_id,
-                "record_title": file.filename,
-                "status": status,
-                "duration": duration * 1000,
-                "storage_id": storage_id,
-            }
-        )
-
-    return JSONResponse(status_code=200, content=responses)
+    return analyze_data_handler(db_session, processed_data, current_user)
 
 
 @api_router.post("/reprocess")
