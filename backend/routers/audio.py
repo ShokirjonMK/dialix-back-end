@@ -72,6 +72,7 @@ async def get_audio_and_results(
             owner_id=str(current_user.id),
             filter_params=result_filter_params,
         )
+
         if result_filter_params:
             if result is None:
                 """if filters are being applied, and 
@@ -84,8 +85,13 @@ async def get_audio_and_results(
         record["audio_url"] = audio_url
 
         if result:
-            summary = result.get("summary", None)
-            checklist_result = result.get("checklist_result", None)
+            result: dict
+
+            summary, checklist_result = (
+                result.get("summary"),
+                result.get("checklist_result"),
+            )
+
             if summary and checklist_result:
                 record["result"] = adapt_json(result)
                 full_audios.append(record)
