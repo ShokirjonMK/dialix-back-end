@@ -1,22 +1,25 @@
 import os
 import uuid
+import shutil
 import logging
 import typing as t  # noqa: F401
 
 from decouple import config
 
-from fastapi import UploadFile
 from fastapi.responses import JSONResponse
+from fastapi import UploadFile, Request, HTTPException, status
 
 from celery.result import AsyncResult
 
 from backend import db
-
-from workers.api import api_processing
+from backend.core import settings
 from workers.data import upsert_data
+from workers.api import api_processing
+from utils.audio import get_audio_duration
 from backend.utils.validators import validate_filename
 from backend.services.checklist import get_single_checklist
-from backend.core.dependencies import DatabaseSessionDependency
+from backend.core.dependencies.user import get_current_user
+from backend.core.dependencies.database import DatabaseSessionDependency
 
 from backend.schemas import User
 from utils.storage import upload_file
@@ -31,15 +34,19 @@ def generate_task_id(user_id) -> str:
     return f"{user_id}/{uuid.uuid4()}"
 
 
+def get_object_storage_id(extension):
+    return f"{uuid.uuid4()}.{extension}"
+
+
 def analyze_data_handler(
     db_session: DatabaseSessionDependency,
     processed_data: t.Tuple[
         t.List[UploadFile], t.List[bool], t.List[t.Union[str, None]], t.List[dict]
     ],
     current_user: User,
-    _operator_code: t.Optional[str] = None,  # for now, internal use only
-    _call_type: t.Optional[str] = None,  # for now, internal use only
-    _destination_number: t.Optional[str] = None,  # for now, internal use only
+    _operator_code: t.Optional[str] = None,
+    _call_type: t.Optional[str] = None,
+    _destination_number: t.Optional[str] = None,
 ):
     responses = []
 
@@ -53,12 +60,16 @@ def analyze_data_handler(
         files, general, checklist_id, processed_files
     ):
         if (
-            get_single_checklist(
-                db_session=db_session,
-                owner_id=current_user.id,
-                checklist_id=checklist_id,
+            checklist_id is not None
+            and checklist_id != "null"
+            and (
+                get_single_checklist(
+                    db_session=db_session,
+                    owner_id=current_user.id,
+                    checklist_id=checklist_id,
+                )
+                is None
             )
-            is None
         ):
             err_message = f"Checklist with {checklist_id=} is not found!"
             logging.warning(err_message)
@@ -191,3 +202,106 @@ def analyze_data_handler(
         )
 
     return JSONResponse(status_code=200, content=responses)
+
+
+async def estimate_costs(
+    request: Request, db_session: DatabaseSessionDependency
+) -> dict[str, str]:
+    current_user = get_current_user(request, db_session)
+    balance = db.get_balance(owner_id=str(current_user.id)).get("sum") or 0
+
+    form_data = await request.form()
+
+    files = form_data.getlist("files")
+    general = [gen == "true" for gen in form_data.getlist("general")]
+    checklist_id = [
+        chk if chk != "null" else None for chk in form_data.getlist("checklist_id")
+    ]
+
+    logging.info(
+        f"Form data => {form_data.getlist('general')=} {form_data.getlist('checklist_id')=}"
+    )
+
+    processed_files = []
+
+    total_price = 0
+    total_mohirai_price = 0
+    total_general_price = 0
+    total_checklist_price = 0
+
+    if len(files) != len(general) or len(files) != len(checklist_id):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Mismatched lengths of arrays.",
+        )
+
+    cost_report = {}
+
+    for file, gen, checklist in zip(files, general, checklist_id):
+        storage_id = get_object_storage_id(file.filename.split(".")[-1])
+        file_path = os.path.join("uploads", storage_id)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        duration = get_audio_duration(file_path)
+
+        if duration is None:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": "Invalid audio file"},
+            )
+
+        duration *= 1_000
+
+        processed_files.append({"file_path": file_path, "duration": duration})
+
+        mohirai_price = (
+            duration * settings.MOHIRAI_PRICE_PER_MS
+            if gen is True or checklist is not None
+            else 0
+        )
+        general_price = (
+            duration * settings.GENERAL_PROMPT_PRICE_PER_MS if gen is True else 0
+        )
+        checklist_price = (
+            duration * settings.CHECKLIST_PROMPT_PRICE_PER_MS
+            if checklist is not None
+            else 0
+        )
+
+        total_for_this_audio = mohirai_price + general_price + checklist_price
+        total_mohirai_price += mohirai_price
+        total_general_price += general_price
+        total_checklist_price += checklist_price
+        total_price += total_for_this_audio
+
+        cost_report[file.filename] = {
+            "duration": duration,
+            "mohirai_price": mohirai_price,
+            "general_price": general_price,
+            "checklist_price": checklist_price,
+            "total_for_this_audio": total_for_this_audio,
+        }
+
+    for file in processed_files:
+        if os.path.exists(file["file_path"]):
+            os.remove(file["file_path"])
+
+    response_content = {
+        "total_price": total_price,
+        "current_balance": balance,
+        "is_enough": balance >= total_price,
+        "total_mohirai_price": total_mohirai_price,
+        "total_general_price": total_general_price,
+        "total_checklist_price": total_checklist_price,
+        "detailed": cost_report,
+    }
+
+    if response_content["is_enough"]:
+        response_content["balance_after"] = float(balance) - total_price
+
+    return response_content
