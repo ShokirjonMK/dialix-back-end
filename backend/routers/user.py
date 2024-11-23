@@ -19,11 +19,9 @@ from backend.services.credentials import (
     insert_or_update_bitrix_credential,
 )
 
-from backend.core.dependencies import (
-    DatabaseSessionDependency,
-    get_current_user,
-    CurrentUser,
-)
+from backend.core.dependencies.database import DatabaseSessionDependency
+from backend.core.dependencies.user import get_current_user, CurrentUser
+
 
 user_router = APIRouter(tags=["User"])
 
@@ -106,7 +104,7 @@ def retrieve_current_user(current_user: CurrentUser):
 
 @user_router.get("/balance")
 def retrieve_current_user_balance(current_user: User = Depends(get_current_user)):
-    balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0)
+    balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0) or 0
     return {"balance": balance}
 
 

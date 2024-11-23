@@ -1,8 +1,8 @@
 import logging
 import typing as t  # noqa: F401
-from uuid import UUID
 
 import httpx
+
 from fastapi.responses import JSONResponse
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -11,15 +11,12 @@ from celery.result import AsyncResult
 from backend.core import settings
 from workers.common import celery as celery_app
 from backend.schemas import User, PBXCallHistoryRequest
-from backend.utils.pbx import filter_calls
 
 from backend.services.operator import create_operators
-from backend.services.record import get_all_record_titles
-from backend.core.dependencies import (
-    DatabaseSessionDependency,
-    PbxCredentialsDependency,
-    get_current_user,
-)
+from backend.core.dependencies.pbx import PbxCredentialsDependency
+from backend.core.dependencies.user import get_current_user
+from backend.core.dependencies.database import DatabaseSessionDependency
+
 from backend.tasks.pbx import process_pbx_call_task
 
 pbx_router = APIRouter(tags=["PBX Integration"])
@@ -99,51 +96,6 @@ async def sync_operators(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error syncing operators: {exc}",
         )
-
-
-@pbx_router.get("/history")
-async def list_call_history(
-    db_session: DatabaseSessionDependency,
-    pbx_credentials: PbxCredentialsDependency,
-    start_stamp_from: str,
-    end_stamp_to: str,
-    current_user: User = Depends(get_current_user),
-):
-    existing_record_titles: list[str] = get_all_record_titles(
-        db_session, current_user.id
-    )
-
-    logging.info("Preparing and sending request ...")
-    url = f"{settings.PBX_API_URL.format(domain=pbx_credentials.domain)}/mongo_history/search.json"
-
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            url,
-            headers={
-                "x-pbx-authentication": f"{pbx_credentials.key_id}:{pbx_credentials.key}",
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            data={
-                "start_stamp_from": start_stamp_from,
-                "end_stamp_to": end_stamp_to,
-            },
-            timeout=60,
-        )
-        logging.info(f"Response arrived: {response.status_code=}")
-
-    json_response = response.json()
-
-    if int(json_response["status"]) == 0:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=json_response["comment"],
-        )
-
-    logging.info(f"Total number of calls is {len(json_response['data'])}")
-    filtered_calls = filter_calls(json_response["data"], existing_record_titles)
-    logging.info(f"Filtering is done total number of calls={len(filtered_calls)}")
-
-    return JSONResponse(content=filtered_calls, status_code=status.HTTP_200_OK)
 
 
 @pbx_router.post("/history")
