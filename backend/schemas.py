@@ -167,6 +167,10 @@ class PBXCallHistoryRequest(BaseModel):
         description="Unique identifier for the checklist, e.g., '213e4567-e89b-12d3-a456-426614174000'",
     )
 
+    general: t.Optional[bool] = Field(
+        default=False, description="Whether you want general checker or not"
+    )
+
     uuid: UUID = Field(
         description="Unique identifier for the call, e.g., '123e4567-e89b-12d3-a456-426614174000'",
     )

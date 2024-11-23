@@ -22,7 +22,7 @@ from backend.tasks.pbx import process_pbx_call_task
 pbx_router = APIRouter(tags=["PBX Integration"])
 
 
-@pbx_router.get("/pbx_operators")
+@pbx_router.get("/pbx-operators")
 async def get_users(pbx_credentials: PbxCredentialsDependency):
     url = f"{settings.PBX_API_URL.format(domain=pbx_credentials.domain)}/user/get.json"
 
@@ -50,7 +50,7 @@ async def get_users(pbx_credentials: PbxCredentialsDependency):
         )
 
 
-@pbx_router.post("/sync_operators")
+@pbx_router.post("/sync-operators")
 async def sync_operators(
     db_session: DatabaseSessionDependency,
     pbx_credentials: PbxCredentialsDependency,
@@ -123,10 +123,14 @@ async def process_from_call_history(
 @pbx_router.get("/history/status/{task_id}")
 async def get_task_status(task_id: str):
     result = AsyncResult(task_id, app=celery_app)
+
     if result.state == "PENDING":
         return {"status": "Pending"}
+
     elif result.state == "SUCCESS":
         return {"status": "Success", "result": result.result}
+
     elif result.state == "FAILURE":
         return {"status": "Failure", "error": str(result.info)}
+
     return {"status": result.state}

@@ -14,6 +14,7 @@ from backend.schemas import (
     ReprocessRecord,
     RecordQueryParams,
     ResultQueryParams,
+    PBXCallHistoryRequest,
 )
 from backend.core import settings
 from workers.data import upsert_data
@@ -23,8 +24,12 @@ from utils.storage import get_stream_url
 from backend.utils.pbx import filter_calls
 from backend.services.record import get_all_record_titles
 from backend.core.dependencies.user import get_current_user
-from backend.core.dependencies.pbx import get_pbx_credentials
-from backend.utils.analyze import analyze_data_handler, estimate_costs
+from backend.core.dependencies.pbx import get_pbx_credentials, PbxCredentialsDependency
+from backend.utils.analyze import (
+    analyze_data_handler,
+    estimate_costs_from_pbx,
+    estimate_costs_from_upload,
+)
 from backend.core.dependencies.database import DatabaseSessionDependency
 from backend.core.dependencies.audio_processing import process_form_data
 
@@ -179,7 +184,26 @@ async def analyze_data(
 async def estimate_cost_before_process(
     request: Request, db_session: DatabaseSessionDependency
 ):
-    return await estimate_costs(request, db_session)
+    return await estimate_costs_from_upload(request, db_session)
+
+
+@audio_router.post("/estimate-from-pbx", dependencies=[Depends(get_current_user)])
+def estimate_cost_before_process_from_pbx(
+    data: PBXCallHistoryRequest,
+    pbx_credentials: PbxCredentialsDependency,
+    request: Request,
+    db_session: DatabaseSessionDependency,
+):
+    return estimate_costs_from_pbx(
+        request,
+        db_session,
+        data.uuid,
+        pbx_credentials.domain,
+        pbx_credentials.key_id,
+        pbx_credentials.key,
+        data.general,
+        data.checklist_id,
+    )
 
 
 @audio_router.post("/reprocess")

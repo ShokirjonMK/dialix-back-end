@@ -16,6 +16,7 @@ from backend.core import settings
 from workers.data import upsert_data
 from workers.api import api_processing
 from utils.audio import get_audio_duration
+from backend.utils.pbx import load_call_from_pbx
 from backend.utils.validators import validate_filename
 from backend.services.checklist import get_single_checklist
 from backend.core.dependencies.user import get_current_user
@@ -204,24 +205,61 @@ def analyze_data_handler(
     return JSONResponse(status_code=200, content=responses)
 
 
-async def estimate_costs(
+def estimate_costs_from_pbx(
+    request: Request,
+    db_session: DatabaseSessionDependency,
+    call_id: uuid.UUID,
+    domain: str,
+    key_id: str,
+    key: str,
+    general: bool,
+    checklist_id: t.Optional[uuid.UUID] = None,
+) -> dict[str, str]:
+    pbx_url = settings.PBX_API_URL.format(domain=domain) + "/mongo_history/search.json"
+
+    logging.info(f"{pbx_url=}")
+    _files, _general, _checklist = load_call_from_pbx(
+        call_id, pbx_url, key_id, key, general, checklist_id
+    )
+
+    logging.info(
+        f"Routing {_files=} {_general=} {_checklist=} to estimate_costs_generic"
+    )
+
+    return estimate_costs_generic(
+        request, db_session, _files, _general, _checklist, from_pbx=True
+    )
+
+
+async def estimate_costs_from_upload(
     request: Request, db_session: DatabaseSessionDependency
 ) -> dict[str, str]:
-    current_user = get_current_user(request, db_session)
-    balance = db.get_balance(owner_id=str(current_user.id)).get("sum") or 0
-
     form_data = await request.form()
 
     files = form_data.getlist("files")
     general = [gen == "true" for gen in form_data.getlist("general")]
-    checklist_id = [
-        checklist if checklist != "null" or checklist != "" else None
+    checklist_ids = [
+        checklist if checklist not in ("null", "", None) else None
         for checklist in form_data.getlist("checklist_id")
     ]
 
     logging.info(
         f"Form data => {form_data.getlist('general')=} {form_data.getlist('checklist_id')=}"
     )
+
+    return estimate_costs_generic(request, db_session, files, general, checklist_ids)
+
+
+def estimate_costs_generic(
+    request: Request,
+    db_session: DatabaseSessionDependency,
+    files: list[UploadFile],
+    general: list[str],
+    checklist_id: list[str],
+    from_pbx: t.Optional[bool] = False,
+) -> dict[str, str]:
+    current_user = get_current_user(request, db_session)
+    balance = db.get_balance(owner_id=str(current_user.id)).get("sum") or 0
 
     processed_files = []
 
@@ -239,12 +277,19 @@ async def estimate_costs(
     cost_report = {}
 
     for file, gen, checklist in zip(files, general, checklist_id):
-        storage_id = get_object_storage_id(file.filename.split(".")[-1])
-        file_path = os.path.join("uploads", storage_id)
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        file_path: str = None
 
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        if not from_pbx:
+            storage_id = get_object_storage_id(file.filename.split(".")[-1])
+            file_path = os.path.join("uploads", storage_id)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+            with open(file_path, "wb") as buffer:
+                logging.info(f"SHUTIL: {file} => {file_path}")
+                shutil.copyfileobj(file.file, buffer)
+
+        else:
+            file_path = f"./audios/{file.filename}"
 
         duration = get_audio_duration(file_path)
 
