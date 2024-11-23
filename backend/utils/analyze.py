@@ -215,7 +215,8 @@ async def estimate_costs(
     files = form_data.getlist("files")
     general = [gen == "true" for gen in form_data.getlist("general")]
     checklist_id = [
-        chk if chk != "null" else None for chk in form_data.getlist("checklist_id")
+        checklist if checklist != "null" or checklist != "" else None
+        for checklist in form_data.getlist("checklist_id")
     ]
 
     logging.info(
