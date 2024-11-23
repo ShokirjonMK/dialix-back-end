@@ -6,7 +6,7 @@ import requests
 import typing as t  # noqa: F401
 from uuid import UUID
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, UploadFile
 
 from backend.core import settings
 
@@ -105,3 +105,41 @@ def extract_tar_file(tar_path: str, where: str) -> None:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Couldn't extract tarball: {exc}",
         )
+
+
+def load_call_from_pbx(
+    call_id: UUID,
+    pbx_url: str,
+    key_id: str,
+    key: str,
+    general: bool,
+    checklist_id: t.Optional[UUID] = None,
+):
+    call_info_response = sync_get_call_info_by(call_id, pbx_url, key_id, key)
+
+    if int(call_info_response["status"]) == 0:
+        logging.error("Invalid credentials.")
+        return {"error": call_info_response["comment"]}
+
+    call_info = call_info_response["data"][0]
+
+    if call_info["user_talk_time"] == 0:
+        logging.error("Call has no user talk time.")
+        return {"error": "User did not say any word, and we need to analyze that?"}
+
+    download_url_response = sync_get_call_download_url(
+        {"uuid": call_id, "download": "1"}, pbx_url, key_id, key
+    )
+    filename = f"call-{call_id}.mp3"
+    download_file_path = f"./audios/{filename}"
+    download_url = download_url_response.get("data")
+
+    downloaded_file = sync_download_from(download_url, download_file_path)
+    logging.info(f"Downloaded file path: {downloaded_file}")
+
+    with open(downloaded_file, "rb") as audio_file:
+        upload_file = UploadFile(audio_file, filename=filename)
+
+    processed_data = ([upload_file], [general], [checklist_id])
+
+    return processed_data

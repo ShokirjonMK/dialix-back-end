@@ -33,6 +33,7 @@ def process_pbx_call_task(*args, **kwargs):
 
     try:
         call_info_response = sync_get_call_info_by(uuid, url, key_id, key)
+
         if int(call_info_response["status"]) == 0:
             logging.error("Invalid credentials.")
             return {"error": call_info_response["comment"]}
