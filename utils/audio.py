@@ -25,6 +25,7 @@ def generate_waveform(input_path, output_path):
 
 def get_audio_duration(local_path):
     duration = None
+
     try:
         command = [
             "ffprobe",
@@ -36,10 +37,7 @@ def get_audio_duration(local_path):
             "default=noprint_wrappers=1:nokey=1",
             local_path,
         ]
-        result = subprocess.run(
-            command,
-            capture_output=True,
-        )
+        result = subprocess.run(command, capture_output=True)
         logging.warning(f"result: {result}")
         if result.returncode == 0:
             # Parse the output to get the duration
@@ -47,4 +45,5 @@ def get_audio_duration(local_path):
             duration = float(output)
     except Exception as e:
         logging.error(f"Error getting audio duration: {e}")
+
     return duration

@@ -20,10 +20,6 @@ from backend.database.utils import db_connection_wrapper, select_many, select_on
 
 register_adapter(uuid.UUID, lambda _uuid: psycopg2.extensions.AsIs(str(uuid)))
 
-MOHIRAI_PRICE_PER_MS: float = 630 / 60 / 1000 * 100
-GENERAL_PROMPT_PRICE_PER_MS: float = 210 / 60 / 1000 * 100
-CHECKLIST_PROMPT_PRICE_PER_MS: float = 360 / 60 / 1000 * 100
-
 
 @db_connection_wrapper
 def get_user_by_email(connection: Connection, email: str):

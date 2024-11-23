@@ -4,8 +4,8 @@ import typing as t  # noqa: F401
 from fastapi import APIRouter
 
 from backend.utils.bitrix import get_deals_by_phone
+from backend.core.dependencies.bitrix import BitrixCredentialsDependency
 from backend.schemas import FinalCallStatusRequest, FinalCallStatusResponse
-from backend.core.dependencies import BitrixCredentialsDependency
 
 
 bitrix_router = APIRouter(tags=["Bitrix Integration"])

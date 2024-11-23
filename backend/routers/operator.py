@@ -6,7 +6,8 @@ from fastapi import Depends, APIRouter, status
 
 
 from backend.services import operator as operator_service
-from backend.core.dependencies import DatabaseSessionDependency, get_current_user
+from backend.core.dependencies.user import get_current_user
+from backend.core.dependencies.database import DatabaseSessionDependency
 from backend.utils.shortcuts import model_to_dict, models_to_dict, raise_404
 from backend.schemas import (
     User,
