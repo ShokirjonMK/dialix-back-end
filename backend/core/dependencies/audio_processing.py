@@ -26,14 +26,15 @@ async def process_form_data(request: Request, db_session: DatabaseSessionDepende
     logging.info(f"{files=}")
     general = [gen == "true" for gen in form_data.getlist("general")]
     checklist_id = [
-        chk if chk != "null" else None for chk in form_data.getlist("checklist_id")
+        checklist if checklist != "null" or checklist != "" else None
+        for checklist in form_data.getlist("checklist_id")
     ]
     balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0) or 0
     balance = balance if balance is not None else 0
     total_price = 0
     processed_files = []
 
-    for file, gen, chk in zip(files, general, checklist_id):
+    for file, gen, checklist in zip(files, general, checklist_id):
         storage_id = get_object_storage_id(file.filename.split(".")[-1])
         file_path = os.path.join("uploads", storage_id)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -56,14 +57,14 @@ async def process_form_data(request: Request, db_session: DatabaseSessionDepende
 
         mohirai_price = (
             duration * settings.MOHIRAI_PRICE_PER_MS
-            if gen is True or chk is not None
+            if gen is True or checklist is not None
             else 0
         )
         general_price = (
             duration * settings.GENERAL_PROMPT_PRICE_PER_MS if gen is True else 0
         )
         checklist_price = (
-            duration * settings.CHECKLIST_PROMPT_PRICE_PER_MS if chk is not None else 0
+            duration * settings.CHECKLIST_PROMPT_PRICE_PER_MS if checklist is not None else 0
         )
         total_price += mohirai_price + general_price + checklist_price
 
