@@ -1,7 +1,7 @@
 import typing as t
 from uuid import UUID
 
-from sqlalchemy import select, and_  # noqa: F401
+from sqlalchemy import select, outerjoin  # noqa: F401
 # from sqlalchemy.orm import Session
 
 from backend.database.models import Result, Checklist
@@ -24,8 +24,8 @@ def get_results_by_record_id_sa(  # sa -> SQLAlchemy
 ):
     statement = (
         select(Result, Checklist.title.label("checklist_title"))
+        .select_from(outerjoin(Result, Checklist, Result.checklist_id == Checklist.id))
         .where((Result.owner_id == owner_id) & (Result.record_id == record_id))
-        .join(Checklist, Result.checklist_id == Checklist.id)
     )
 
     if is_conversation_over:
