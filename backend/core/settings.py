@@ -36,6 +36,12 @@ ECHO_SQL: bool = config("ECHO_SQL", cast=bool, default=False)
 ALGORITHM: str = config("AUTH_ALGORITHM")
 SECRET_KEY: str = config("AUTH_SECRET_KEY")
 
+###
+# Pricing
+###
+MOHIRAI_PRICE_PER_MS: float = 630 / 60 / 1000 * 100
+GENERAL_PROMPT_PRICE_PER_MS: float = 210 / 60 / 1000 * 100
+CHECKLIST_PROMPT_PRICE_PER_MS: float = 360 / 60 / 1000 * 100
 
 ###
 # Other

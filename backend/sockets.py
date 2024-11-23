@@ -8,7 +8,8 @@ from http.cookies import SimpleCookie
 
 from backend.schemas import User
 from backend.utils.shortcuts import model_to_dict
-from backend.core.dependencies import get_db_session, get_current_user_websocket
+from backend.core.dependencies.database import get_db_session
+from backend.core.dependencies.user import get_current_user_websocket
 
 REDIS_URL: str = config("REDIS_URL")
 
@@ -22,10 +23,7 @@ sio_server = socketio.AsyncServer(
     engineio_logger=True,
 )
 
-sio_app = socketio.ASGIApp(
-    socketio_server=sio_server,
-    socketio_path="/ws/socket.io",
-)
+sio_app = socketio.ASGIApp(socketio_server=sio_server, socketio_path="/ws/socket.io")
 
 
 @sio_server.event
