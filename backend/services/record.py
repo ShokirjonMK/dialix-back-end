@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.database.models import Record
+from backend.utils.shortcuts import get_filterable_values_for
 from backend.database.utils import compile_sql_query_and_params
 
 
@@ -18,6 +19,24 @@ def get_record_by_title(db_session: Session, owner_id: UUID, title: str) -> Reco
 def get_all_record_titles(db_session: Session, owner_id: UUID):
     statement = select(Record.title).where((Record.owner_id == owner_id))
     return db_session.scalars(statement).all()
+
+
+def get_filterable_values_for_record(
+    db_session: Session, owner_id: UUID
+) -> dict[str, list[str]]:
+    return get_filterable_values_for(
+        Record,
+        [
+            "call_type",
+            "client_phone_number",
+            "operator_code",
+            "operator_name",
+            "status",
+            "duration",
+        ],
+        db_session,
+        owner_id,
+    )
 
 
 def get_records_sa(  # sa -> SQLAlchemy
@@ -50,7 +69,7 @@ def get_records_sa(  # sa -> SQLAlchemy
 
     if transcript_contains:
         statement = statement.where(
-            Record.payload["result"].op("->>")("text").ilike(f"%{transcript_contains}%")
+            Record.payload["result"].op("->>")("text").contains(transcript_contains)
         )
 
     return compile_sql_query_and_params(statement)

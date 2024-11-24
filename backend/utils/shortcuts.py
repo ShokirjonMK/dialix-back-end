@@ -1,5 +1,10 @@
 import typing as t
+from uuid import UUID
 from pydantic import BaseModel
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from fastapi import HTTPException, status
 
 
@@ -45,3 +50,19 @@ def raise_404(
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND, detail=detail, headers=headers
     )
+
+
+def get_distinct_values(db_session: Session, column, owner_id: UUID):
+    query = select(column).filter(column.isnot(None)).distinct()
+    return db_session.execute(query).scalars().all()
+
+
+def get_filterable_values_for(
+    table_class, columns: list[str], db_session: Session, owner_id: UUID
+) -> dict[str, list[str]]:
+    result = dict()
+
+    for column in [getattr(table_class, column) for column in columns]:
+        result[column.name] = get_distinct_values(db_session, column, owner_id)
+
+    return result

@@ -22,8 +22,12 @@ from utils.encoder import adapt_json
 from workers.api import api_processing
 from utils.storage import get_stream_url
 from backend.utils.pbx import filter_calls
-from backend.services.record import get_all_record_titles
-from backend.core.dependencies.user import get_current_user
+from backend.services.record import (
+    get_all_record_titles,
+    get_filterable_values_for_record,
+)
+from backend.services.result import get_filterable_values_for_result
+from backend.core.dependencies.user import get_current_user, CurrentUser
 from backend.core.dependencies.pbx import get_pbx_credentials, PbxCredentialsDependency
 from backend.utils.analyze import (
     analyze_data_handler,
@@ -40,6 +44,16 @@ audio_router = APIRouter(tags=["Audios"])
 
 def generate_task_id(user_id) -> str:
     return f"{user_id}/{uuid.uuid4()}"
+
+
+@audio_router.get("/filterable-values")
+def get_filterable_values(
+    db_session: DatabaseSessionDependency, current_user: CurrentUser
+):
+    return {
+        **get_filterable_values_for_record(db_session, current_user.id),
+        **get_filterable_values_for_result(db_session, current_user.id),
+    }
 
 
 @audio_router.get("/audios_results")
