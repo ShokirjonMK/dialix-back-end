@@ -1,7 +1,7 @@
-import asyncio
-import json
-import logging
 import os
+import json
+import asyncio
+import logging  # noqa: F401
 
 from workers.common import celery, PredictTask
 import backend.db as db
@@ -71,15 +71,15 @@ def upsert_data(self: PredictTask, *args, **kwargs):
             else existing_checklist_response
         )
 
-        db.upsert_record(record={**existing_record, "status": "COMPLETED"})
+        db.upsert_record(
+            record={
+                **existing_record,
+                "status": "COMPLETED",
+                "bitrix_result": json.dumps(task_result.get("bitrix_result")),
+            }
+        )
 
         if isinstance(checklist_response, str):
-            logging.info(
-                "Checklist response: {}".format(
-                    checklist_response.strip("`").strip("json").strip("\n")
-                )
-            )
-
             checklist_response = json.loads(
                 checklist_response.strip("`").strip("json").strip("\n")
             )
@@ -112,12 +112,7 @@ def upsert_data(self: PredictTask, *args, **kwargs):
         )
 
     else:
-        db.upsert_record(
-            record={
-                **existing_record,
-                "status": "FAILED",
-            }
-        )
+        db.upsert_record(record={**existing_record, "status": "FAILED"})
 
         loop.run_until_complete(
             redis_manager.emit(

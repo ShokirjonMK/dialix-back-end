@@ -2,7 +2,6 @@ import logging
 import requests
 import typing as t
 
-
 from fastapi import Depends, status
 from sqlalchemy import select
 
@@ -49,6 +48,7 @@ def get_pbx_keys(
 def get_pbx_credentials(
     db_session: DatabaseSessionDependency,
     current_user: User = Depends(get_current_user),
+    raise_exc: t.Optional[bool] = True,
 ) -> PbxCredentialsFull:
     logging.info("PBX cred works!")
     pbx_credentials = db_session.scalar(
@@ -56,7 +56,8 @@ def get_pbx_credentials(
     )
 
     if not pbx_credentials:
-        raise_401("No pbx credentials found")
+        err_msg = "No pbx credentials found"
+        return raise_401(err_msg) if raise_exc else None
 
     if pbx_credentials.key is None or pbx_credentials.key_id is None:
         logging.info("Pbx key and key_id is NULL, getting new keys")
@@ -78,7 +79,9 @@ def get_pbx_credentials(
     ):
         logging.info("Updating pbx keys, they are not valid")
         update_pbx_credentials(db_session, current_user.id, None, None)
-        raise_401("Pbx keys are not valid!")
+
+        err_msg = "Pbx keys are not valid!"
+        return raise_401(err_msg) if raise_exc else None
 
     pbx_credentials_full = PbxCredentialsFull(
         domain=pbx_credentials.domain,

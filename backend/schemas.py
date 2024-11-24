@@ -288,7 +288,6 @@ class FinalCallStatusRequest(BaseModel):
 
     @validator("client_phone_number", pre=True, always=True)
     def strip_whitespace(cls, value: str) -> str:
-        print(f"{value=}")
         if isinstance(value, str):
             return value.strip().replace(" ", "")
 

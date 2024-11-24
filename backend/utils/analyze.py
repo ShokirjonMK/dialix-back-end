@@ -7,13 +7,20 @@ import typing as t  # noqa: F401
 from decouple import config
 
 from fastapi.responses import JSONResponse
-from fastapi import UploadFile, Request, HTTPException, status
+from fastapi import UploadFile, Request, HTTPException, status as http_status
 
 from celery.result import AsyncResult
 
 from backend import db
+from backend.schemas import User
 from backend.core import settings
 from workers.data import upsert_data
+from utils.storage import upload_file
+from utils.data_manipulation import (
+    find_operator_code,
+    find_call_type,
+    get_phone_number_from_filename,
+)
 from workers.api import api_processing
 from utils.audio import get_audio_duration
 from backend.utils.pbx import load_call_from_pbx
@@ -21,14 +28,6 @@ from backend.utils.validators import validate_filename
 from backend.services.checklist import get_single_checklist
 from backend.core.dependencies.user import get_current_user
 from backend.core.dependencies.database import DatabaseSessionDependency
-
-from backend.schemas import User
-from utils.storage import upload_file
-from utils.data_manipulation import (
-    find_operator_code,
-    find_call_type,
-    get_phone_number_from_filename,
-)
 
 
 def generate_task_id(user_id) -> str:
@@ -57,31 +56,33 @@ def analyze_data_handler(
         f"Received request: {files=} {general=} {checklist_id=} {processed_files=}"
     )
 
-    for file, general, checklist_id, processed_file in zip(
-        files, general, checklist_id, processed_files
-    ):
-        if (
-            checklist_id is not None
-            and checklist_id != "null"
-            and (
-                get_single_checklist(
-                    db_session=db_session,
-                    owner_id=current_user.id,
-                    checklist_id=checklist_id,
-                )
-                is None
-            )
+    for single_checklist_id in checklist_id:
+        if single_checklist_id in ["", None, "null"]:
+            continue
+
+        if not get_single_checklist(
+            db_session=db_session,
+            owner_id=current_user.id,
+            checklist_id=single_checklist_id,
         ):
-            err_message = f"Checklist with {checklist_id=} is not found!"
+            err_message = f"Checklist with {single_checklist_id=} is not found!"
             logging.warning(err_message)
 
-            return JSONResponse(
-                status_code=400, content={"success": False, "detail": err_message}
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail={"success": False, "detail": err_message},
             )
 
+    for file, general, single_checklist_id, processed_file in zip(
+        files, general, checklist_id, processed_files
+    ):
         record_id = str(uuid.uuid4())
         owner_id = str(current_user.id)
-        status = "UPLOADED" if general is False and checklist_id is None else "PENDING"
+        status = (
+            "UPLOADED"
+            if general is False and single_checklist_id is None
+            else "PENDING"
+        )
         storage_id = processed_file["file_path"].split("/")[-1]
         file_path = processed_file["file_path"]
         duration = processed_file["duration"]
@@ -142,7 +143,7 @@ def analyze_data_handler(
         # waveform_local_path = f"uploads/transcode_waveform_{storage_id}.dat"
         # generate_waveform(audio_local_path, waveform_local_path)
 
-        if general is False and checklist_id is None:
+        if general is False and single_checklist_id is None:
             responses.append(
                 {
                     "id": task_id,
@@ -161,9 +162,10 @@ def analyze_data_handler(
             kwargs={
                 "task": {
                     "audio_record": audio_record,
-                    "checklist_id": checklist_id,
+                    "checklist_id": single_checklist_id,
                     "general": general,
                     "folder_name": folder_name,
+                    "client_phone_number": client_phone_number,
                 },
             },
             link=upsert_data.s(
@@ -171,7 +173,7 @@ def analyze_data_handler(
                     "task_id": task_id,
                     "owner_id": owner_id,
                     "record_id": audio_record["id"],
-                    "checklist_id": checklist_id,
+                    "checklist_id": single_checklist_id,
                     "storage_id": audio_record["storage_id"],
                     "is_success": True,
                 }
@@ -181,7 +183,7 @@ def analyze_data_handler(
                     "task_id": task_id,
                     "owner_id": owner_id,
                     "record_id": audio_record["id"],
-                    "checklist_id": checklist_id,
+                    "checklist_id": single_checklist_id,
                     "storage_id": audio_record["storage_id"],
                     "is_success": False,
                 }
@@ -194,7 +196,7 @@ def analyze_data_handler(
             {
                 "id": task.id,
                 "record_id": record_id,
-                "checklist_id": checklist_id,
+                "checklist_id": single_checklist_id,
                 "record_title": file.filename,
                 "status": status,
                 "duration": duration * 1000,
@@ -202,7 +204,7 @@ def analyze_data_handler(
             }
         )
 
-    return JSONResponse(status_code=200, content=responses)
+    return JSONResponse(status_code=http_status.HTTP_200_OK, content=responses)
 
 
 def estimate_costs_from_pbx(
@@ -270,7 +272,7 @@ def estimate_costs_generic(
 
     if len(files) != len(general) or len(files) != len(checklist_id):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Mismatched lengths of arrays.",
         )
 
@@ -297,7 +299,7 @@ def estimate_costs_generic(
             if os.path.exists(file_path):
                 os.remove(file_path)
             return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=http_status.HTTP_400_BAD_REQUEST,
                 content={"error": "Invalid audio file"},
             )
 

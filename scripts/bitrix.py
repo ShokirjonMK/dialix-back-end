@@ -2,6 +2,7 @@ import json
 import httpx
 import random
 import asyncio
+import logging
 import argparse
 from decouple import config
 from typing import Optional
@@ -23,7 +24,7 @@ async def get_random_contact(generate_random: Optional[bool] = False) -> None:
 
         contacts = response.json().get("result", [])
         if not contacts:
-            print("No contacts found in Bitrix24.")
+            logging.error("No contacts found in Bitrix24.")
             return None
 
         contacts_with_phones = [
@@ -36,7 +37,7 @@ async def get_random_contact(generate_random: Optional[bool] = False) -> None:
         ]
 
         if not contacts_with_phones:
-            print("No contacts with phone numbers found.")
+            logging.error("No contacts with phone numbers found.")
             return None
 
         result = (
@@ -44,7 +45,7 @@ async def get_random_contact(generate_random: Optional[bool] = False) -> None:
             if generate_random
             else contacts_with_phones
         )
-        print(json.dumps(result))
+        logging.info(json.dumps(result))
 
         return
 
