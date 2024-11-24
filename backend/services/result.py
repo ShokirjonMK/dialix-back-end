@@ -9,30 +9,27 @@ from backend.utils.shortcuts import get_filterable_values_for
 from backend.database.utils import compile_sql_query_and_params
 
 
+FILTERABLE_COLUMNS: list[str] = [
+    "owner_id",
+    "checklist_id",
+    "is_conversation_over",
+    "customer_gender",
+    "call_purpose",
+    "how_old_is_customer",
+    "list_of_words_define_customer_sentiment",
+    "list_of_words_define_operator_sentiment",
+    "which_platform_customer_found_about_the_course",
+    "which_course_customer_interested",
+    "sentiment_analysis_of_conversation",
+    "sentiment_analysis_of_operator",
+    "sentiment_analysis_of_customer",
+]
+
+
 def get_filterable_values_for_result(
     db_session: Session, owner_id: UUID
 ) -> dict[str, list[str]]:
-    return get_filterable_values_for(
-        Result,
-        [
-            "owner_id",
-            "checklist_id",
-            "is_conversation_over",
-            "customer_gender",
-            "call_purpose",
-            "record_id",
-            "how_old_is_customer",
-            "reason_for_customer_purchase",
-            "reason_for_customer_sentiment",
-            "reason_for_operator_sentiment",
-            "reason_for_conversation_sentiment",
-            "list_of_words_define_customer_sentiment",
-            "list_of_words_define_operator_sentiment",
-            "which_platform_customer_found_about_the_course",
-        ],
-        db_session,
-        owner_id,
-    )
+    return get_filterable_values_for(Result, FILTERABLE_COLUMNS, db_session, owner_id)
 
 
 def get_results_by_record_id_sa(  # sa -> SQLAlchemy

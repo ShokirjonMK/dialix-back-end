@@ -322,16 +322,18 @@ def get_pbx_call_history(db_session, current_user, start_stamp_from, end_stamp_t
     url = f"{settings.PBX_API_URL.format(domain=pbx_credentials.domain)}/mongo_history/search.json"
 
     with httpx.Client() as client:
+        filter_data = {
+            "start_stamp_from": start_stamp_from,
+            "end_stamp_to": end_stamp_to,
+        }
+
         response = client.post(
             url,
             headers={
                 "x-pbx-authentication": f"{pbx_credentials.key_id}:{pbx_credentials.key}",
                 "Content-Type": "application/x-www-form-urlencoded",
             },
-            data={
-                "start_stamp_from": start_stamp_from,
-                "end_stamp_to": end_stamp_to,
-            },
+            data=filter_data,
             timeout=60,
         )
         logging.info(f"Response arrived: {response.status_code=}")
