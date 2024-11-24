@@ -46,8 +46,10 @@ class Record(Base):
     call_type = Column(String, nullable=True)
     source = Column(String)
     status = Column(String)
-    client_phone_number = Column(String, nullable=True)
     storage_id = Column(String)
+    client_phone_number = Column(String, nullable=True)
+    bitrix_result = Column(JSON)
+
     created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
     updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
     deleted_at = Column(TIMESTAMP)

@@ -15,7 +15,7 @@ bitrix_router = APIRouter(tags=["Bitrix Integration"])
 async def final_call_status(
     data: FinalCallStatusRequest, bitrix_credentials: BitrixCredentialsDependency
 ):
-    name, deals = await get_deals_by_phone(
+    name, deals = get_deals_by_phone(
         bitrix_credentials.webhook_url, data.client_phone_number
     )
 
