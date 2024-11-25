@@ -1,3 +1,4 @@
+import logging
 import typing as t
 from uuid import UUID
 
@@ -5,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.database.models import Record
+from backend.utils.parser import parse_order_by
 from backend.utils.shortcuts import get_filterable_values_for
 from backend.database.utils import compile_sql_query_and_params
 
@@ -16,6 +18,7 @@ FILTERABLE_COLUMNS: list[str] = [
     "status",
     "duration",
 ]
+ORDERABLE_COLUMNS: list[str] = FILTERABLE_COLUMNS
 
 
 def get_record_by_title(db_session: Session, owner_id: UUID, title: str) -> Record:
@@ -44,7 +47,10 @@ def get_records_sa(  # sa -> SQLAlchemy
     call_status: t.Optional[str] = None,
     client_phone_number: t.Optional[str] = None,
     transcript_contains: t.Optional[str] = None,
+    **order_kwargs,
 ):
+    logging.info(f"{order_kwargs=}")
+
     statement = select(Record).where(Record.owner_id == owner_id)
 
     if operator_code:
@@ -68,5 +74,12 @@ def get_records_sa(  # sa -> SQLAlchemy
         statement = statement.where(
             Record.payload["result"].op("->>")("text").contains(transcript_contains)
         )
+
+    order_clauses = parse_order_by(Record, order_kwargs)
+
+    logging.info(f"Record => {order_clauses=} {order_kwargs=}")
+
+    if order_clauses:
+        statement = statement.order_by(*order_clauses)
 
     return compile_sql_query_and_params(statement)
