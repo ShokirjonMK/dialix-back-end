@@ -315,7 +315,7 @@ async def get_pending_audios(current_user: User = Depends(get_current_user)):
 def get_pbx_call_history(db_session, current_user, start_stamp_from, end_stamp_to):
     pbx_credentials = get_pbx_credentials(db_session, current_user, raise_exc=False)
 
-    if pbx_credentials:
+    if not pbx_credentials:
         logging.warning(f"No pbx credentials are found for {current_user.username=}")
         return []
 

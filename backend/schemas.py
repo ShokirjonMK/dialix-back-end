@@ -13,9 +13,34 @@ from pydantic import (
     model_validator,
     StringConstraints,
     SecretStr,
+    ValidationError,
 )
 
 ChecklistPayload = t.Union[t.List[str], t.Dict[str, t.List[str]]]
+
+ORDERABLE_COLUMNS_RECORD: list[str] = [
+    "call_type",
+    "client_phone_number",
+    "operator_code",
+    "operator_name",
+    "status",
+    "duration",
+]
+ORDERABLE_COLUMNS_RESULT: list[str] = [
+    "owner_id",
+    "checklist_id",
+    "is_conversation_over",
+    "customer_gender",
+    "call_purpose",
+    "how_old_is_customer",
+    "list_of_words_define_customer_sentiment",
+    "list_of_words_define_operator_sentiment",
+    "which_platform_customer_found_about_the_course",
+    "which_course_customer_interested",
+    "sentiment_analysis_of_conversation",
+    "sentiment_analysis_of_operator",
+    "sentiment_analysis_of_customer",
+]
 
 
 class PbxCredentials(BaseModel):
@@ -269,6 +294,25 @@ class RecordQueryParams(BaseModel):
     client_phone_number: t.Optional[str] = None
     transcript_contains: t.Optional[str] = None
 
+    # Ordering stuff, god forgive me.
+    duration_asc: t.Optional[bool | None] = None
+    duration_desc: t.Optional[bool | None] = None
+
+    operator_code_asc: t.Union[bool | None] = None
+    operator_code_desc: t.Union[bool | None] = None
+
+    operator_name_asc: t.Optional[bool | None] = None
+    operator_name_desc: t.Optional[bool | None] = None
+
+    call_type_asc: t.Optional[bool | None] = None
+    call_type_desc: t.Optional[bool | None] = None
+
+    call_status_asc: t.Optional[bool | None] = None
+    call_status_desc: t.Optional[bool | None] = None
+
+    client_phone_number_asc: t.Optional[bool | None] = None
+    client_phone_number_desc: t.Optional[bool | None] = None
+
 
 class ResultQueryParams(BaseModel):
     is_conversation_over: t.Optional[bool] = None
@@ -281,6 +325,37 @@ class ResultQueryParams(BaseModel):
     reason_for_customer_purchase: t.Optional[str] = None
     which_platform_customer_found_about_the_course: t.Optional[str] = None
     call_purpose: t.Optional[str] = None
+
+    # Ordering stuff, god forgive me.
+    is_conversation_over_asc: t.Optional[bool | None] = None
+    is_conversation_over_desc: t.Optional[bool | None] = None
+
+    sentiment_analysis_of_conversation_asc: t.Optional[bool | None] = None
+    sentiment_analysis_of_conversation_desc: t.Optional[bool | None] = None
+
+    sentiment_analysis_of_operator_asc: t.Optional[bool | None] = None
+    sentiment_analysis_of_operator_desc: t.Optional[bool | None] = None
+
+    sentiment_analysis_of_customer_asc: t.Optional[bool | None] = None
+    sentiment_analysis_of_customer_desc: t.Optional[bool | None] = None
+
+    is_customer_satisfied_asc: t.Optional[bool | None] = None
+    is_customer_satisfied_desc: t.Optional[bool | None] = None
+
+    is_customer_agreed_to_buy_asc: t.Optional[bool | None] = None
+    is_customer_agreed_to_buy_desc: t.Optional[bool | None] = None
+
+    is_customer_interested_to_product_asc: t.Optional[bool | None] = None
+    is_customer_interested_to_product_desc: t.Optional[bool | None] = None
+
+    reason_for_customer_purchase_asc: t.Optional[bool | None] = None
+    reason_for_customer_purchase_desc: t.Optional[bool | None] = None
+
+    which_platform_customer_found_about_the_course_asc: t.Optional[bool | None] = None
+    which_platform_customer_found_about_the_course_desc: t.Optional[bool | None] = None
+
+    call_purpose_asc: t.Optional[bool | None] = None
+    call_purpose_desc: t.Optional[bool | None] = None
 
 
 class FinalCallStatusRequest(BaseModel):

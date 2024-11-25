@@ -1,9 +1,11 @@
+import logging
 import typing as t
 from uuid import UUID
 
 from sqlalchemy import select, outerjoin  # noqa: F401
 from sqlalchemy.orm import Session
 
+from backend.utils.parser import parse_order_by
 from backend.database.models import Result, Checklist
 from backend.utils.shortcuts import get_filterable_values_for
 from backend.database.utils import compile_sql_query_and_params
@@ -45,6 +47,7 @@ def get_results_by_record_id_sa(  # sa -> SQLAlchemy
     reason_for_customer_purchase: t.Optional[str] = None,
     which_platform_customer_found_about_the_course: t.Optional[str] = None,
     call_purpose: t.Optional[str] = None,
+    **order_kwargs,
 ):
     statement = (
         select(Result, Checklist.title.label("checklist_title"))
@@ -99,5 +102,12 @@ def get_results_by_record_id_sa(  # sa -> SQLAlchemy
         )
     if call_purpose:
         statement = statement.where(Result.call_purpose.contains(call_purpose))
+
+    order_clauses = parse_order_by(Result, order_kwargs)
+
+    logging.info(f"Result => {order_clauses=} {order_kwargs=}")
+
+    if order_clauses:
+        statement = statement.order_by(*order_clauses)
 
     return compile_sql_query_and_params(statement)
