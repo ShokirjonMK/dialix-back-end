@@ -15,6 +15,8 @@ from backend.schemas import (
     RecordQueryParams,
     ResultQueryParams,
     PBXCallHistoryRequest,
+    RecordOrderQueries,
+    ResultOrderQueries,
 )
 from backend.core import settings
 from workers.data import upsert_data
@@ -62,6 +64,8 @@ async def get_audio_and_results(
     current_user: User = Depends(get_current_user),
     record_query_params: RecordQueryParams = Depends(),
     result_query_params: ResultQueryParams = Depends(),
+    record_order_query_params: RecordOrderQueries = Depends(),
+    result_order_query_params: ResultOrderQueries = Depends(),
     start_stamp_from: t.Optional[str] = None,
     end_stamp_to: t.Optional[str] = None,
 ):
@@ -73,11 +77,6 @@ async def get_audio_and_results(
     )
     logging.info(f"{record_filter_params=} {result_filter_params=}")
 
-    recordings = db.get_records_v1(
-        owner_id=str(current_user.id), filter_params=record_filter_params
-    )
-    recordings = adapt_json(recordings)
-
     full_audios = []
     just_audios = []
     general_audios = []
@@ -85,25 +84,19 @@ async def get_audio_and_results(
 
     folder_name = current_user.company_name.lower().replace(" ", "_")
 
+    recordings = db.get_records_v3(
+        owner_id=str(current_user.id),
+        record_filter_params=record_filter_params,
+        result_filter_params=result_filter_params,
+        order_kwargs_record=record_order_query_params.model_dump(exclude_none=True),
+        order_kwargs_result=result_order_query_params.model_dump(exclude_none=True),
+    )
+
     for record in recordings:
-        result = db.get_result_by_record_id(
-            record["id"],
-            owner_id=str(current_user.id),
-            filter_params=result_filter_params,
-        )
-
-        if result_filter_params:
-            if result is None:
-                """if filters are being applied, and 
-                results is NONE then
-                we don't include this recording
-                """
-                continue
-
         audio_url = get_stream_url(f"{folder_name}/{record['storage_id']}")
         record["audio_url"] = audio_url
 
-        if result:
+        if result := record["result"]:
             result: dict
 
             summary, checklist_result = (
@@ -112,16 +105,12 @@ async def get_audio_and_results(
             )
 
             if summary and checklist_result:
-                record["result"] = adapt_json(result)
                 full_audios.append(record)
             elif checklist_result:
-                record["result"] = adapt_json(result)
                 audios_with_checklist.append(record)
             else:
-                record["result"] = adapt_json(result)
                 general_audios.append(record)
         else:
-            record["result"] = None
             just_audios.append(record)
 
     response = {
@@ -137,39 +126,7 @@ async def get_audio_and_results(
             db_session, current_user, start_stamp_from, end_stamp_to
         )
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content=response)
-
-
-@audio_router.get("/v2/audios_results")
-async def get_audio_and_results_v2(current_user: User = Depends(get_current_user)):
-    recordings = db.get_records_v2(owner_id=str(current_user.id))
-
-    recordings = adapt_json(recordings)
-    folder_name = current_user.company_name.lower().replace(" ", "_")
-
-    for record in recordings:
-        result = db.get_result_by_record_id(record["id"], owner_id=str(current_user.id))
-        audio_url = get_stream_url(f"{folder_name}/{record['storage_id']}")
-
-        record["audio_url"] = audio_url
-
-        if not result:
-            record["type"] = "just_audio"
-            record["result"] = None
-        else:
-            summary_exists: bool = result.get("summary") is not None
-            checklist_result_exists: bool = result.get("checklist_result") is not None
-
-            if summary_exists and checklist_result_exists:
-                record["type"] = "full_audio"
-            elif checklist_result_exists:
-                record["type"] = "audio_with_checklist"
-            else:
-                record["type"] = "general_audio"
-
-            record["result"] = adapt_json(result)
-
-    return JSONResponse(status_code=status.HTTP_200_OK, content=recordings)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=adapt_json(response))
 
 
 @audio_router.get("/audio/file/{storage_id}")

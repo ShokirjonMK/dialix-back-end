@@ -13,34 +13,9 @@ from pydantic import (
     model_validator,
     StringConstraints,
     SecretStr,
-    ValidationError,
 )
 
 ChecklistPayload = t.Union[t.List[str], t.Dict[str, t.List[str]]]
-
-ORDERABLE_COLUMNS_RECORD: list[str] = [
-    "call_type",
-    "client_phone_number",
-    "operator_code",
-    "operator_name",
-    "status",
-    "duration",
-]
-ORDERABLE_COLUMNS_RESULT: list[str] = [
-    "owner_id",
-    "checklist_id",
-    "is_conversation_over",
-    "customer_gender",
-    "call_purpose",
-    "how_old_is_customer",
-    "list_of_words_define_customer_sentiment",
-    "list_of_words_define_operator_sentiment",
-    "which_platform_customer_found_about_the_course",
-    "which_course_customer_interested",
-    "sentiment_analysis_of_conversation",
-    "sentiment_analysis_of_operator",
-    "sentiment_analysis_of_customer",
-]
 
 
 class PbxCredentials(BaseModel):
@@ -294,6 +269,8 @@ class RecordQueryParams(BaseModel):
     client_phone_number: t.Optional[str] = None
     transcript_contains: t.Optional[str] = None
 
+
+class RecordOrderQueries(BaseModel):
     # Ordering stuff, god forgive me.
     duration_asc: t.Optional[bool | None] = None
     duration_desc: t.Optional[bool | None] = None
@@ -326,6 +303,8 @@ class ResultQueryParams(BaseModel):
     which_platform_customer_found_about_the_course: t.Optional[str] = None
     call_purpose: t.Optional[str] = None
 
+
+class ResultOrderQueries(BaseModel):
     # Ordering stuff, god forgive me.
     is_conversation_over_asc: t.Optional[bool | None] = None
     is_conversation_over_desc: t.Optional[bool | None] = None
