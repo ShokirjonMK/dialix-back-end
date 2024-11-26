@@ -14,8 +14,8 @@ import psycopg2
 import psycopg2.extras
 from psycopg2.extensions import register_adapter, connection as Connection
 
-from backend.services.record import get_records_sa
 from backend.services.result import get_results_by_record_id_sa
+from backend.services.record import get_records_sa, get_records_with_results
 from backend.database.utils import db_connection_wrapper, select_many, select_one
 
 register_adapter(uuid.UUID, lambda _uuid: psycopg2.extensions.AsIs(str(uuid)))
@@ -94,6 +94,31 @@ def get_records_v2(connection: Connection, owner_id: str):
         "from record where owner_id = %s",
         (owner_id,),
     )
+
+
+@db_connection_wrapper
+def get_records_v3(
+    connection: Connection,
+    owner_id: str,
+    record_filter_params: t.Optional[dict] = None,
+    result_filter_params: t.Optional[dict] = None,
+    order_kwargs_record: t.Optional[dict] = None,
+    order_kwargs_result: t.Optional[dict] = None,
+):
+    """
+    Better version, only for real chads
+    Older version was fetching records first
+    then by iterating over these records, it will query for results
+    which is BAD. This query implements left outer join & json build func.
+    """
+    sql_query, query_params = get_records_with_results(
+        owner_id,
+        **record_filter_params,
+        **result_filter_params,
+        order_kwargs_result=order_kwargs_result,
+        order_kwargs_record=order_kwargs_record,
+    )
+    return select_many(connection, sql_query, query_params)
 
 
 @db_connection_wrapper
