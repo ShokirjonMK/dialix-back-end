@@ -38,6 +38,9 @@ def get_balance(connection: Connection, owner_id: str):
         return dict(cursor.fetchone())
 
 
+RECORD_JSON_FIELDS: tuple[str] = ("payload", "bitrix_result")
+
+
 @db_connection_wrapper
 def upsert_record(connection: Connection, record):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
@@ -46,7 +49,7 @@ def upsert_record(connection: Connection, record):
 
         values = [
             psycopg2.extras.Json(record[key])
-            if key == "payload" and isinstance(record[key], dict)
+            if key in RECORD_JSON_FIELDS and isinstance(record[key], dict)
             else record[key]
             for key in keys
         ]
