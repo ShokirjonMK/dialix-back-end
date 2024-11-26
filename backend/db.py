@@ -44,21 +44,25 @@ def upsert_record(connection: Connection, record):
         keys = [key for key in record.keys() if key not in ["created_at", "updated_at"]]
         id = record.get("id")
 
-        cursor.execute(
-            f"INSERT INTO record ({', '.join(keys)}) VALUES ({', '.join(['%s'] * len(keys))}) ON CONFLICT (id) DO UPDATE SET {', '.join([f'{key} = %s' for key in keys])}, updated_at = NOW() WHERE record.id = %s RETURNING *",
-            tuple(
-                [
-                    (
-                        psycopg2.extras.Json(record[key])
-                        if key == "payload" and isinstance(record[key], dict)
-                        else record[key]
-                    )
-                    for key in keys
-                ]
-            )
-            * 2
-            + (id,),
-        )
+        values = [
+            psycopg2.extras.Json(record[key])
+            if key == "payload" and isinstance(record[key], dict)
+            else record[key]
+            for key in keys
+        ]
+
+        insert_query = f"""
+            INSERT INTO record ({', '.join(keys)})
+            VALUES ({', '.join(['%s'] * len(keys))})
+            ON CONFLICT (id) DO UPDATE SET
+            {', '.join([f'{key} = %s' for key in keys])},
+            updated_at = NOW()
+            WHERE record.id = %s
+            RETURNING *
+        """
+
+        cursor.execute(insert_query, values * 2 + [id])
+
         return dict(cursor.fetchone())
 
 
