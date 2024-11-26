@@ -263,6 +263,4 @@ def get_records_with_results(
     if order_clauses_result := parse_order_by(Result, order_kwargs_result):
         statement = statement.order_by(*order_clauses_result)
 
-    sql, params = compile_sql_query_and_params(statement)
-    logging.info(f"{sql=}")
-    return sql, params
+    return compile_sql_query_and_params(statement)
