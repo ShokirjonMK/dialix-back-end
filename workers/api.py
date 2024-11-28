@@ -8,6 +8,7 @@ import openai
 from decouple import config
 import openai.error
 
+from backend.core import settings
 from utils.storage import download_file, file_exists
 from workers.common import celery, PredictTask
 from utils.data_manipulation import (
@@ -21,6 +22,9 @@ from utils.data_manipulation import (
 )
 import backend.db as db
 from utils.mohirai import mohirAI
+from backend.utils.bitrix import get_deals_by_phone
+from backend.core.dependencies.database import get_db_session
+from backend.core.dependencies.bitrix import get_bitrix_credentials_celery
 
 checklist_prompt = """
     You are given a conversation between a call center operator and a potential customer. 
@@ -157,6 +161,7 @@ def api_processing(self: PredictTask, **kwargs):
     general = task.get("general")
     record_payload = record.get("payload", {})
     folder_name = task.get("folder_name", "")
+    client_phone_number = task.get("client_phone_number")
 
     if not task or not record:
         logging.error("Task data is not provided")
@@ -174,7 +179,8 @@ def api_processing(self: PredictTask, **kwargs):
     if not record_payload:
         logging.warning("MohirAI payload is not found in the record")
         record_payload = mohirAI(file_path)
-        amount = record["duration"] * db.MOHIRAI_PRICE_PER_MS
+        amount = record["duration"] * settings.MOHIRAI_PRICE_PER_MS
+        logging.info(f"[TRANSACTION] MohirAI price {amount=}")
         db.create_transaction(
             owner_id=record["owner_id"],
             record_id=record["id"],
@@ -212,10 +218,13 @@ def api_processing(self: PredictTask, **kwargs):
         gender = gender["result"]["gender"]
         logging.info(f"Gender detected: {gender}")
         general_response = general_checker(conversation, general_prompt, courses_list)
+        logging.info(
+            f"[TRANSACTION] General price {record['duration'] * settings.GENERAL_PROMPT_PRICE_PER_MS}"
+        )
         db.create_transaction(
             owner_id=record["owner_id"],
             record_id=record["id"],
-            amount=record["duration"] * db.GENERAL_PROMPT_PRICE_PER_MS,
+            amount=record["duration"] * settings.GENERAL_PROMPT_PRICE_PER_MS,
             type="general prompt",
         )
         json_text = extract_json_from_markdown(general_response)
@@ -228,8 +237,10 @@ def api_processing(self: PredictTask, **kwargs):
                 "customer_gender": gender,
             }
         )
+    else:
+        logging.info(f"Will not process via general for {file_path=} coz {general=}")
 
-    if checklist_id:
+    if checklist_id and checklist_id is not None:
         checklist = db.get_checklist_by_id(
             checklist_id, owner_id=str(record["owner_id"])
         )
@@ -243,17 +254,38 @@ def api_processing(self: PredictTask, **kwargs):
                 courses_list,
                 checklist=checklist.get("payload"),
             )
+            logging.info(
+                f"[TRANSACTION] Checklist price: {record['duration'] * settings.CHECKLIST_PROMPT_PRICE_PER_MS}"
+            )
             db.create_transaction(
                 owner_id=record["owner_id"],
                 record_id=record["id"],
-                amount=record["duration"] * db.CHECKLIST_PROMPT_PRICE_PER_MS,
+                amount=record["duration"] * settings.CHECKLIST_PROMPT_PRICE_PER_MS,
                 type="checklist prompt",
             )
         else:
             logging.warning(f"Checklist not found for id: {checklist_id}")
             checklist_response = {}
+    else:
+        logging.info(
+            f"Will not process via checklist for {file_path=} coz {checklist_id=}"
+        )
+
+    bitrix_result = None
+
+    if client_phone_number and record["bitrix_result"] is None:
+        db_session = next(get_db_session())
+        bitrix_credentials = get_bitrix_credentials_celery(
+            db_session, owner_id=record["owner_id"]
+        )
+        if bitrix_credentials:
+            contact_name, result = get_deals_by_phone(
+                bitrix_credentials.webhook_url, client_phone_number
+            )
+            bitrix_result = {"customer_name": contact_name, "deals": result}
 
     return {
         "general_response": json_data,
         "checklist_response": checklist_response,
+        "bitrix_result": bitrix_result,
     }

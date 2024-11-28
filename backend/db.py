@@ -14,15 +14,11 @@ import psycopg2
 import psycopg2.extras
 from psycopg2.extensions import register_adapter, connection as Connection
 
-from backend.services.record import get_records_sa
 from backend.services.result import get_results_by_record_id_sa
+from backend.services.record import get_records_sa, get_records_with_results
 from backend.database.utils import db_connection_wrapper, select_many, select_one
 
 register_adapter(uuid.UUID, lambda _uuid: psycopg2.extensions.AsIs(str(uuid)))
-
-MOHIRAI_PRICE_PER_MS: float = 630 / 60 / 1000 * 100
-GENERAL_PROMPT_PRICE_PER_MS: float = 210 / 60 / 1000 * 100
-CHECKLIST_PROMPT_PRICE_PER_MS: float = 360 / 60 / 1000 * 100
 
 
 @db_connection_wrapper
@@ -42,27 +38,34 @@ def get_balance(connection: Connection, owner_id: str):
         return dict(cursor.fetchone())
 
 
+RECORD_JSON_FIELDS: tuple[str] = ("payload", "bitrix_result")
+
+
 @db_connection_wrapper
 def upsert_record(connection: Connection, record):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         keys = [key for key in record.keys() if key not in ["created_at", "updated_at"]]
         id = record.get("id")
 
-        cursor.execute(
-            f"INSERT INTO record ({', '.join(keys)}) VALUES ({', '.join(['%s'] * len(keys))}) ON CONFLICT (id) DO UPDATE SET {', '.join([f'{key} = %s' for key in keys])}, updated_at = NOW() WHERE record.id = %s RETURNING *",
-            tuple(
-                [
-                    (
-                        psycopg2.extras.Json(record[key])
-                        if key == "payload" and isinstance(record[key], dict)
-                        else record[key]
-                    )
-                    for key in keys
-                ]
-            )
-            * 2
-            + (id,),
-        )
+        values = [
+            psycopg2.extras.Json(record[key])
+            if key in RECORD_JSON_FIELDS and isinstance(record[key], dict)
+            else record[key]
+            for key in keys
+        ]
+
+        insert_query = f"""
+            INSERT INTO record ({', '.join(keys)})
+            VALUES ({', '.join(['%s'] * len(keys))})
+            ON CONFLICT (id) DO UPDATE SET
+            {', '.join([f'{key} = %s' for key in keys])},
+            updated_at = NOW()
+            WHERE record.id = %s
+            RETURNING *
+        """
+
+        cursor.execute(insert_query, values * 2 + [id])
+
         return dict(cursor.fetchone())
 
 
@@ -98,6 +101,31 @@ def get_records_v2(connection: Connection, owner_id: str):
         "from record where owner_id = %s",
         (owner_id,),
     )
+
+
+@db_connection_wrapper
+def get_records_v3(
+    connection: Connection,
+    owner_id: str,
+    record_filter_params: t.Optional[dict] = None,
+    result_filter_params: t.Optional[dict] = None,
+    order_kwargs_record: t.Optional[dict] = None,
+    order_kwargs_result: t.Optional[dict] = None,
+):
+    """
+    Better version, only for real chads
+    Older version was fetching records first
+    then by iterating over these records, it will query for results
+    which is BAD. This query implements left outer join & json build func.
+    """
+    sql_query, query_params = get_records_with_results(
+        owner_id,
+        **record_filter_params,
+        **result_filter_params,
+        order_kwargs_result=order_kwargs_result,
+        order_kwargs_record=order_kwargs_record,
+    )
+    return select_many(connection, sql_query, query_params)
 
 
 @db_connection_wrapper

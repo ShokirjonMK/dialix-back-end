@@ -7,10 +7,10 @@ from fastapi import Depends, APIRouter, status
 
 from backend import db
 from utils.encoder import adapt_json
-from backend.core.auth import get_current_user
 from backend.services import checklist as checklist_service
+from backend.core.dependencies.user import get_current_user
+from backend.core.dependencies.database import DatabaseSessionDependency
 from backend.schemas import User, CheckList, CheckListUpdate, CheckListCreate
-from backend.core.dependencies import DatabaseSessionDependency
 from backend.utils.shortcuts import model_to_dict, models_to_dict, raise_404
 
 checklist_router = APIRouter(tags=["Checklist"])

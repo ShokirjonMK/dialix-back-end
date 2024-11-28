@@ -1,81 +1,47 @@
 import logging
-import typing as t
+import typing as t  # noqa: F401
 
-import requests
+import httpx
 
 from fastapi.responses import JSONResponse
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from celery.result import AsyncResult
 
 from backend.core import settings
-from backend.api import analyze_data
-from backend.core.auth import get_current_user
+from workers.common import celery as celery_app
 from backend.schemas import User, PBXCallHistoryRequest
-from backend.utils.pbx import (
-    download_from,
-    get_call_info_by,
-    get_call_download_url,
-    paginate_response,
-    filter_calls,
-)
+
 from backend.services.operator import create_operators
-from backend.core.dependencies import DatabaseSessionDependency
+from backend.core.dependencies.pbx import PbxCredentialsDependency
+from backend.core.dependencies.user import get_current_user
+from backend.core.dependencies.database import DatabaseSessionDependency
+
+from backend.tasks.pbx import process_pbx_call_task
 
 pbx_router = APIRouter(tags=["PBX Integration"])
 
 
-@pbx_router.post("/auth/{domain}")
-def authenticate(
-    domain: str,
-    api_key: str,
-    current_user: User = Depends(get_current_user),
-):
-    url = f"{settings.PBX_API_URL.format(domain=domain)}/auth.json"
+@pbx_router.get("/pbx-operators")
+async def get_users(pbx_credentials: PbxCredentialsDependency):
+    url = f"{settings.PBX_API_URL.format(domain=pbx_credentials.domain)}/user/get.json"
 
     try:
-        response = requests.post(
-            url,
-            headers={
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "application/json",
-            },
-            data={"auth_key": api_key},
-        )
-
-        if response.status_code == status.HTTP_200_OK:
-            return JSONResponse(
-                status_code=response.status_code, content=response.json()
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url,
+                headers={
+                    "x-pbx-authentication": f"{pbx_credentials.key_id}:{pbx_credentials.key}",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
             )
-        raise HTTPException(status_code=response.status_code, detail=response.text)
 
-    except requests.exceptions.RequestException as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error on authenticating to PBX: {exc}",
-        )
+        response_data = response.json()
 
-
-@pbx_router.get("/pbx_operators/{domain}")
-def get_users(
-    domain: str,
-    key_id: str,
-    key: str,
-    current_user: User = Depends(get_current_user),
-):
-    url = f"{settings.PBX_API_URL.format(domain=domain)}/user/get.json"
-
-    try:
-        response = requests.post(
-            url,
-            headers={
-                "x-pbx-authentication": f"{key_id}:{key}",
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-        )
-
-        if response.json()["status"] != "1":
+        if response_data["status"] != "1":
             raise HTTPException(status_code=response.status_code, detail=response.text)
 
-        return JSONResponse(content=response.json(), status_code=status.HTTP_200_OK)
+        return JSONResponse(content=response_data, status_code=status.HTTP_200_OK)
 
     except Exception as exc:
         raise HTTPException(
@@ -84,26 +50,27 @@ def get_users(
         )
 
 
-@pbx_router.post("/sync_operators/{domain}")
-def sync_operators(
+@pbx_router.post("/sync-operators")
+async def sync_operators(
     db_session: DatabaseSessionDependency,
-    domain: str,
-    key_id: str,
-    key: str,
+    pbx_credentials: PbxCredentialsDependency,
     current_user: User = Depends(get_current_user),
 ):
-    url = f"{settings.PBX_API_URL.format(domain=domain)}/user/get.json"
+    url = f"{settings.PBX_API_URL.format(domain=pbx_credentials.domain)}/user/get.json"
 
     try:
-        response = requests.post(
-            url,
-            headers={
-                "x-pbx-authentication": f"{key_id}:{key}",
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-        )
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url,
+                headers={
+                    "x-pbx-authentication": f"{pbx_credentials.key_id}:{pbx_credentials.key}",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+            )
 
-        if response.json()["status"] != "1":
+        response_data = response.json()
+
+        if response_data["status"] != "1":
             raise HTTPException(status_code=response.status_code, detail=response.text)
 
         operators_data: list[dict] = [
@@ -112,8 +79,7 @@ def sync_operators(
                 "code": int(operator.get("num")),
                 "owner_id": current_user.id,
             }
-            for operator in response.json()["data"]
-            # if operator.get("enabled") # optional ...
+            for operator in response_data["data"]
         ]
 
         create_operators(db_session, operators_data)
@@ -128,108 +94,43 @@ def sync_operators(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching call history: {exc}",
+            detail=f"Error syncing operators: {exc}",
         )
 
 
-@pbx_router.get("/history/{domain}")
-async def list_call_history(
-    domain: str,
-    key_id: str,
-    key: str,
-    start_stamp_from: str,
-    end_stamp_to: str,
-    page_number: int,
-    page_size: t.Optional[int] = 10,
-    current_user: User = Depends(get_current_user),
-):
-    logging.info("Preparing and sending request ...")
-    url = f"{settings.PBX_API_URL.format(domain=domain)}/mongo_history/search.json"
-
-    response = requests.post(
-        url,
-        headers={
-            "x-pbx-authentication": f"{key_id}:{key}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        data={"start_stamp_from": start_stamp_from, "end_stamp_to": end_stamp_to},
-    )
-    response.raise_for_status()
-    json_response = response.json()
-
-    logging.info("Response is received ...")
-
-    if int(json_response["status"]) == 0:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail=json_response["comment"]
-        )
-
-    logging.info(f"Total number of calls is {len(json_response['data'] )}")
-
-    filtered_calls = filter_calls(json_response["data"])
-    logging.info(f"Number of filtered calls: {len(filtered_calls)}")
-
-    response_content = paginate_response(filtered_calls, page_number, page_size)
-
-    return JSONResponse(content=response_content, status_code=status.HTTP_200_OK)
-
-
-@pbx_router.post("/history/{domain}")
+@pbx_router.post("/history")
 async def process_from_call_history(
     request: PBXCallHistoryRequest,
-    domain: str,
-    key_id: str,
-    key: str,
+    pbx_credentials: PbxCredentialsDependency,
     current_user: User = Depends(get_current_user),
 ):
-    data = request.model_dump(exclude_none=True)
-
-    url = f"{settings.PBX_API_URL.format(domain=domain)}/mongo_history/search.json"
-
-    call_info_response = get_call_info_by(request.uuid, url, key_id, key)
-    if int(call_info_response["status"]) == 0:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=call_info_response["comment"],
-        )
-
-    call_info = call_info_response["data"][0]
-    download_url_response = get_call_download_url(data, url, key_id, key)
-
-    if call_info["user_talk_time"] == 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User did not say any word, and we need to analyse that?",
-        )
-
-    download_url = download_url_response.get("data")
-
-    filename = f"call-{request.uuid}.mp3"
-    download_file_path = f"./audios/{filename}"
-
-    downloaded_file = download_from(download_url, download_file_path)
-    logging.info(f"Downloaded file path: {downloaded_file}")
-
-    with open(downloaded_file, "rb") as audio_file:
-        upload_file = UploadFile(audio_file, filename=filename)
-
-    processed_data = (
-        [upload_file],
-        [True],
-        [request.checklist_id],
-        [{"file_path": download_file_path, "duration": call_info["duration"]}],
+    task = process_pbx_call_task.delay(
+        uuid=request.uuid,
+        checklist_id=request.checklist_id,
+        domain=pbx_credentials.domain,
+        key_id=pbx_credentials.key_id,
+        key=pbx_credentials.key,
+        user_id=current_user.id,
     )
 
-    logging.info(f"Preparing: {processed_data=}")
+    logging.info(f"Task {task} is routed to celery")
+    return {
+        "task_id": task.id,
+        "message": "Processing started. Check status using task_id.",
+    }
 
-    response = await analyze_data(
-        processed_data=processed_data,
-        current_user=current_user,
-        _operator_code=call_info["caller_id_number"],
-        _call_type=call_info["accountcode"],
-        _destination_number=call_info["destination_number"],
-    )
 
-    logging.info(f"Analysis endpoint's {response.status_code=} {response.body=}")
+@pbx_router.get("/history/status/{task_id}")
+async def get_task_status(task_id: str):
+    result = AsyncResult(task_id, app=celery_app)
 
-    return response
+    if result.state == "PENDING":
+        return {"status": "Pending"}
+
+    elif result.state == "SUCCESS":
+        return {"status": "Success", "result": result.result}
+
+    elif result.state == "FAILURE":
+        return {"status": "Failure", "error": str(result.info)}
+
+    return {"status": result.state}

@@ -7,14 +7,21 @@ from fastapi import APIRouter, Depends, HTTPException, Body, status
 from fastapi.security import HTTPBasicCredentials, OAuth2PasswordRequestForm
 
 from backend import db
-from backend.schemas import UserCreate, User
 from backend.utils.auth import add_to_blacklist
+from backend.utils.shortcuts import model_to_dict, raise_404
+from backend.schemas import UserCreate, User, PutCredentials
 from backend.auth.basic import basic_auth_security, basic_auth_wrapper
-from backend.core.auth import generate_access_token, get_current_user, authenticate_user
+from backend.core.auth import generate_access_token, authenticate_user
 
-from backend.services.user import create_user
+from backend.services.user import create_user, get_user_by_id
+from backend.services.credentials import (
+    insert_or_update_pbx_credential,
+    insert_or_update_bitrix_credential,
+)
 
-from backend.core.dependencies import DatabaseSessionDependency
+from backend.core.dependencies.database import DatabaseSessionDependency
+from backend.core.dependencies.user import get_current_user, CurrentUser
+
 
 user_router = APIRouter(tags=["User"])
 
@@ -26,10 +33,11 @@ def signup(
     db_session: DatabaseSessionDependency,
     credentials: HTTPBasicCredentials = Depends(basic_auth_security),
 ) -> JSONResponse:
-    registered_user = create_user(db_session, user.model_dump(mode="json"))
+    account = create_user(db_session, user.model_dump(mode="json"))
 
     return JSONResponse(
-        {"success": True, "user": registered_user}, status_code=status.HTTP_201_CREATED
+        {"success": True, "user": model_to_dict(User, account)},
+        status_code=status.HTTP_201_CREATED,
     )
 
 
@@ -90,13 +98,13 @@ async def logout(
 
 
 @user_router.get("/me")
-def retrieve_current_user(current_user: User = Depends(get_current_user)):
-    return {"user": current_user}
+def retrieve_current_user(current_user: CurrentUser):
+    return {"user": model_to_dict(User, current_user)}
 
 
 @user_router.get("/balance")
 def retrieve_current_user_balance(current_user: User = Depends(get_current_user)):
-    balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0)
+    balance = db.get_balance(owner_id=str(current_user.id)).get("sum", 0) or 0
     return {"balance": balance}
 
 
@@ -121,3 +129,30 @@ def topup(
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST, content={"error": str(exc)}
         )
+
+
+@user_router.put("/put-credentials")
+@basic_auth_wrapper
+def put_credentials(
+    put_credentials: PutCredentials,
+    db_session: DatabaseSessionDependency,
+    credentials: HTTPBasicCredentials = Depends(basic_auth_security),
+) -> JSONResponse:
+    if not get_user_by_id(db_session, put_credentials.owner_id):
+        raise_404("Account with this owner_id is not found")
+
+    if put_credentials.pbx_credentials:
+        insert_or_update_pbx_credential(
+            db_session,
+            put_credentials.owner_id,
+            **put_credentials.model_dump()["pbx_credentials"],
+        )
+
+    if put_credentials.bitrix_credentials:
+        insert_or_update_bitrix_credential(
+            db_session,
+            put_credentials.owner_id,
+            **put_credentials.model_dump()["bitrix_credentials"],
+        )
+
+    return JSONResponse(content={"success": True}, status_code=status.HTTP_200_OK)

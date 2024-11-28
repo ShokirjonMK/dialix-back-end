@@ -4,9 +4,10 @@ from uuid import UUID
 from fastapi.responses import JSONResponse
 from fastapi import Depends, APIRouter, status
 
-from backend.core.auth import get_current_user
+
 from backend.services import operator as operator_service
-from backend.core.dependencies import DatabaseSessionDependency
+from backend.core.dependencies.user import get_current_user
+from backend.core.dependencies.database import DatabaseSessionDependency
 from backend.utils.shortcuts import model_to_dict, models_to_dict, raise_404
 from backend.schemas import (
     User,

@@ -25,6 +25,14 @@ CORS_SETTINGS: dict[str, t.Any] = {
 }
 
 ###
+# Third Party
+###
+MOHIRAI_API_KEY: str = config("MOHIRAI_API_KEY")
+PBX_API_URL = "https://api.onlinepbx.ru/{domain}"
+MOHIRAI_API_URL: str = "https://uzbekvoice.ai/api/v1/stt"
+
+
+###
 # Database
 ###
 DATABASE_URL: str = config("DATABASE_URL")
@@ -36,13 +44,13 @@ ECHO_SQL: bool = config("ECHO_SQL", cast=bool, default=False)
 ALGORITHM: str = config("AUTH_ALGORITHM")
 SECRET_KEY: str = config("AUTH_SECRET_KEY")
 
-
 ###
-# Other
-##
+# Pricing
+###
+MOHIRAI_PRICE_PER_MS: float = 630 / 60 / 1000 * 100
+GENERAL_PROMPT_PRICE_PER_MS: float = 210 / 60 / 1000 * 100
+CHECKLIST_PROMPT_PRICE_PER_MS: float = 360 / 60 / 1000 * 100
 
-PBX_API_URL = "https://api.onlinepbx.ru/{domain}"
-
-# api.py is slowing down startup process.
+# slowing down startup process.
 # currently, I may not need this module
-ENABLE_CORE_API_MODULE: bool = config("ENABLE_CORE_API_MODULE", cast=bool, default=True)
+ANTI_SLOW_DOWN: bool = config("ANTI_SLOW_DOWN", cast=bool, default=False)

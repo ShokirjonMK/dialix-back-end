@@ -1,26 +1,59 @@
+import logging  # noqa: F401
+
 import typing as t
 from uuid import UUID, uuid4
 from datetime import datetime
 
 from pydantic import (
-    BaseModel,
-    EmailStr,
     Field,
-    StringConstraints,
+    EmailStr,
+    BaseModel,
+    validator,
     ConfigDict,
     model_validator,
+    StringConstraints,
+    SecretStr,
 )
 
 ChecklistPayload = t.Union[t.List[str], t.Dict[str, t.List[str]]]
 
 
+class PbxCredentials(BaseModel):
+    domain: str
+    api_key: str
+
+
+class PbxCredentialsFull(BaseModel):
+    domain: t.Optional[str] = None
+
+    api_key: t.Optional[str] = None
+
+    key: t.Optional[str] = None
+    key_id: t.Optional[str] = None
+
+
+class BitrixCredentials(BaseModel):
+    webhook_url: str
+
+
+class PutCredentials(BaseModel):
+    owner_id: UUID
+
+    pbx_credentials: t.Optional[PbxCredentialsFull] = None
+    bitrix_credentials: t.Optional[BitrixCredentials] = None
+
+
 class UserCreate(BaseModel):
     role: str
-    password: str
     email: EmailStr
     company_name: str
+    password: SecretStr
     id: UUID = Field(default_factory=uuid4)
     username: t.Annotated[str, StringConstraints(min_length=3, max_length=255)]
+
+    # optional credentials
+    pbx_credentials: t.Optional[PbxCredentials] = None
+    bitrix_credentials: t.Optional[BitrixCredentials] = None
 
 
 class User(BaseModel):
@@ -31,8 +64,8 @@ class User(BaseModel):
     username: str
     email: EmailStr
     company_name: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: t.Optional[datetime] = None
+    updated_at: t.Optional[datetime] = None
 
 
 class UserPrivate(User):
@@ -134,6 +167,10 @@ class PBXCallHistoryRequest(BaseModel):
         description="Unique identifier for the checklist, e.g., '213e4567-e89b-12d3-a456-426614174000'",
     )
 
+    general: t.Optional[bool] = Field(
+        default=False, description="Whether you want general checker or not"
+    )
+
     uuid: UUID = Field(
         description="Unique identifier for the call, e.g., '123e4567-e89b-12d3-a456-426614174000'",
     )
@@ -233,6 +270,27 @@ class RecordQueryParams(BaseModel):
     transcript_contains: t.Optional[str] = None
 
 
+class RecordOrderQueries(BaseModel):
+    # Ordering stuff, god forgive me.
+    duration_asc: t.Optional[bool | None] = None
+    duration_desc: t.Optional[bool | None] = None
+
+    operator_code_asc: t.Union[bool | None] = None
+    operator_code_desc: t.Union[bool | None] = None
+
+    operator_name_asc: t.Optional[bool | None] = None
+    operator_name_desc: t.Optional[bool | None] = None
+
+    call_type_asc: t.Optional[bool | None] = None
+    call_type_desc: t.Optional[bool | None] = None
+
+    call_status_asc: t.Optional[bool | None] = None
+    call_status_desc: t.Optional[bool | None] = None
+
+    client_phone_number_asc: t.Optional[bool | None] = None
+    client_phone_number_desc: t.Optional[bool | None] = None
+
+
 class ResultQueryParams(BaseModel):
     is_conversation_over: t.Optional[bool] = None
     sentiment_analysis_of_conversation: t.Optional[str] = None
@@ -244,3 +302,70 @@ class ResultQueryParams(BaseModel):
     reason_for_customer_purchase: t.Optional[str] = None
     which_platform_customer_found_about_the_course: t.Optional[str] = None
     call_purpose: t.Optional[str] = None
+
+
+class ResultOrderQueries(BaseModel):
+    # Ordering stuff, god forgive me.
+    is_conversation_over_asc: t.Optional[bool | None] = None
+    is_conversation_over_desc: t.Optional[bool | None] = None
+
+    sentiment_analysis_of_conversation_asc: t.Optional[bool | None] = None
+    sentiment_analysis_of_conversation_desc: t.Optional[bool | None] = None
+
+    sentiment_analysis_of_operator_asc: t.Optional[bool | None] = None
+    sentiment_analysis_of_operator_desc: t.Optional[bool | None] = None
+
+    sentiment_analysis_of_customer_asc: t.Optional[bool | None] = None
+    sentiment_analysis_of_customer_desc: t.Optional[bool | None] = None
+
+    is_customer_satisfied_asc: t.Optional[bool | None] = None
+    is_customer_satisfied_desc: t.Optional[bool | None] = None
+
+    is_customer_agreed_to_buy_asc: t.Optional[bool | None] = None
+    is_customer_agreed_to_buy_desc: t.Optional[bool | None] = None
+
+    is_customer_interested_to_product_asc: t.Optional[bool | None] = None
+    is_customer_interested_to_product_desc: t.Optional[bool | None] = None
+
+    reason_for_customer_purchase_asc: t.Optional[bool | None] = None
+    reason_for_customer_purchase_desc: t.Optional[bool | None] = None
+
+    which_platform_customer_found_about_the_course_asc: t.Optional[bool | None] = None
+    which_platform_customer_found_about_the_course_desc: t.Optional[bool | None] = None
+
+    call_purpose_asc: t.Optional[bool | None] = None
+    call_purpose_desc: t.Optional[bool | None] = None
+
+
+class FinalCallStatusRequest(BaseModel):
+    client_phone_number: str
+
+    @validator("client_phone_number", pre=True, always=True)
+    def strip_whitespace(cls, value: str) -> str:
+        if isinstance(value, str):
+            return value.strip().replace(" ", "")
+
+        return value
+
+
+class FinalCallStatusResponse(BaseModel):
+    class Deal(BaseModel):
+        deal_id: str
+        title: str
+        status: str
+        date_created: datetime
+        date_closed: t.Optional[datetime]
+
+        @validator("status", pre=True, always=True)
+        def strip_whitespace(cls, value: str) -> str:
+            if ":" in value:
+                for part in value.split(":"):
+                    # don't worry about this nested loop
+                    for status in ["win", "won", "lost", "lose"]:
+                        if status in part:
+                            return part
+
+            return value
+
+    client_name: t.Optional[str] = None
+    deals: t.Optional[list[Deal]] = []

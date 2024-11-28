@@ -6,10 +6,10 @@ from fastapi import HTTPException
 
 from http.cookies import SimpleCookie
 
-from backend.core import auth
 from backend.schemas import User
-from backend.database.session_manager import get_db_session
 from backend.utils.shortcuts import model_to_dict
+from backend.core.dependencies.database import get_db_session
+from backend.core.dependencies.user import get_current_user_websocket
 
 REDIS_URL: str = config("REDIS_URL")
 
@@ -23,10 +23,7 @@ sio_server = socketio.AsyncServer(
     engineio_logger=True,
 )
 
-sio_app = socketio.ASGIApp(
-    socketio_server=sio_server,
-    socketio_path="/ws/socket.io",
-)
+sio_app = socketio.ASGIApp(socketio_server=sio_server, socketio_path="/ws/socket.io")
 
 
 @sio_server.event
@@ -44,9 +41,7 @@ async def connect(sid, environ):
         )
         logging.info(f"Socket endpoint: {access_token=}")
 
-        current_user = auth.get_current_user_websocket(
-            access_token, next(get_db_session())
-        )
+        current_user = get_current_user_websocket(access_token, next(get_db_session()))
         if current_user:
             user = model_to_dict(User, current_user, dump_mode="python")
             await sio_server.save_session(sid, {"user": user})

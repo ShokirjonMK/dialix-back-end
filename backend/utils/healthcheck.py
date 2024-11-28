@@ -1,7 +1,7 @@
 import logging
 from sqlalchemy import text
 
-from backend.database.session_manager import get_db_session
+from backend.core.dependencies.database import get_db_session
 
 
 def is_db_working() -> bool | None:

@@ -1,12 +1,12 @@
-import logging
-import os
 import time
+import logging
 import requests
-from ratelimit import limits, sleep_and_retry
 from pydub import AudioSegment
+from ratelimit import limits, sleep_and_retry
+
+from backend.core import settings
 
 
-# Function to calculate sleep time based on audio length
 def calculate_sleep_time(duration_minutes):
     if 0 <= duration_minutes <= 4:
         return 5
@@ -18,23 +18,19 @@ def calculate_sleep_time(duration_minutes):
         return 30
     elif duration_minutes >= 20:
         return 45
-    else:
-        return 8  # No sleep for audio less than 5 minutes
+    return 8
 
 
 @sleep_and_retry
 @limits(calls=5, period=60)
 def mohirAI(file_path):
     logging.warning(f"Processing file in mohirAI function: {file_path}")
-    api_key = (
-        "da7c8191-3842-4d4f-bba8-6867aaaac663:7948f6e2-b1ca-4df1-8a2a-9c5f7828172c"
-    )
+    api_key = settings.MOHIRAI_API_KEY
+
     url = "https://uzbekvoice.ai/api/v1/stt"
     headers = {"Authorization": api_key}
 
-    files = {
-        "file": ("audio.mp3", open(file_path, "rb")),
-    }
+    files = {"file": ("audio.mp3", open(file_path, "rb"))}
     data = {
         "return_offsets": "true",
         "run_diarization": "true",
@@ -42,7 +38,6 @@ def mohirAI(file_path):
         "blocking": "false",
     }
 
-    # Calculate the audio duration and set the poll interval
     audio = AudioSegment.from_file(file_path)
     duration_ms = len(audio)
     duration_minutes = duration_ms / 60000

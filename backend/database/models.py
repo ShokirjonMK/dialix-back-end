@@ -46,8 +46,10 @@ class Record(Base):
     call_type = Column(String, nullable=True)
     source = Column(String)
     status = Column(String)
-    client_phone_number = Column(String, nullable=True)
     storage_id = Column(String)
+    client_phone_number = Column(String, nullable=True)
+    bitrix_result = Column(JSON)
+
     created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
     updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
     deleted_at = Column(TIMESTAMP)
@@ -74,7 +76,7 @@ class Checklist(Base):
     owner_id = Column(
         PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
     )
-    title = Column(String, nullable=False, unique=True)
+    title = Column(String, nullable=False)
     payload = Column(JSON)
     active = Column(Boolean, server_default="false", nullable=False)
     created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
@@ -144,3 +146,35 @@ class OperatorData(Base):
         TIMESTAMP, nullable=False, server_default=text("now()"), onupdate=text("now()")
     )
     deleted_at = Column(TIMESTAMP, nullable=True)
+
+
+class PbxCredentials(Base):
+    __tablename__ = "pbx_credentials"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+
+    owner_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("account.id"),
+        nullable=False,
+        unique=True,
+    )
+    api_key = Column(String, nullable=False)
+    domain = Column(String, unique=True, nullable=False)
+
+    key = Column(String, nullable=True, default=None)
+    key_id = Column(String, nullable=True, default=None)
+
+
+class BitrixCredentials(Base):
+    __tablename__ = "bitrix_credentials"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+
+    owner_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("account.id"),
+        nullable=False,
+        unique=True,
+    )
+    webhook_url = Column(String, unique=True, nullable=False)
