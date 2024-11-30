@@ -1,21 +1,35 @@
+import json
 import math
 import logging
-
 from datetime import datetime, timedelta
 
-from fastapi import Depends, APIRouter
 from fastapi.responses import JSONResponse
+from fastapi import Depends, APIRouter, status
 
 from backend import db
 from backend.schemas import User
 from utils.encoder import adapt_json
+from backend.services import dashboard as dashboard_service
 from backend.core.dependencies.user import get_current_user
+from backend.core.dependencies.database import DatabaseSessionDependency
 
 dashboard_router = APIRouter(tags=["Dashboard"])
 
 
 @dashboard_router.get("/dashboard")
-async def results(current_user: User = Depends(get_current_user)):
+async def list_dashboard(
+    db_session: DatabaseSessionDependency,
+    start: datetime,
+    end: datetime,
+    current_user: User = Depends(get_current_user),
+):
+    gender_data = dashboard_service.get_gender_data(
+        start=start,
+        end=end,
+        owner_id=current_user.id,
+        db=db_session,
+    )
+
     data = db.get_results(owner_id=str(current_user.id))
 
     if len(data) == 0:
@@ -67,19 +81,11 @@ async def results(current_user: User = Depends(get_current_user)):
         "male_count": male_count,
         "female_count": female_count,
         "operator_data": operator_data,
+        "gender_data": gender_data,
         **satisfaction_rate_by_month,
     }
 
-    logging.warning(f"Response content: {content}")
-
-    response = JSONResponse(
-        status_code=200,
-        content=content,
-    )
-
-    logging.warning(f"Dashboard data response: {response}")
-
-    return response
+    return JSONResponse(status_code=status.HTTP_200_OK, content=content)
 
 
 def get_operators_data(owner_id):
@@ -155,7 +161,6 @@ def calculate_daily_satisfaction(data):
                         f"Date {date_str} is out of expected range for current month."
                     )
 
-    # Return the daily satisfaction rates
     return {
         "last_month_daily_satisfaction": last_month_satisfaction,
         "current_month_daily_satisfaction": current_month_satisfaction,
