@@ -2,6 +2,7 @@ import logging  # noqa: F401
 import typing as t
 from uuid import UUID
 from math import floor
+from statistics import median
 from decimal import Decimal
 from datetime import datetime, timedelta
 
@@ -333,22 +334,18 @@ def get_operator_performance_daily(
                 "daily_scores": {d: None for d in formatted_dates},
             }
 
-        if (
-            temp_score := daily_scores[code]["daily_scores"][date.strftime("%Y-%m-%d")]
-        ) is None:
-            daily_scores[code]["daily_scores"][date.strftime("%Y-%m-%d")] = score
+        if (daily_scores[code]["daily_scores"][date.strftime("%Y-%m-%d")]) is None:
+            daily_scores[code]["daily_scores"][date.strftime("%Y-%m-%d")] = [score]
         else:
-            daily_scores[code]["daily_scores"][date.strftime("%Y-%m-%d")] = (
-                score + temp_score
-            )
-            
+            daily_scores[code]["daily_scores"][date.strftime("%Y-%m-%d")].append(score)
+
     result = {}
 
-    def _floor(value: t.Any) -> t.Any:
+    def calculate_avg_score(value: t.Any) -> t.Any:
         if value is None:
             return None
 
-        return floor(value)
+        return floor(median(value))
 
     for code, data in daily_scores.items():
         result[code] = {
@@ -356,7 +353,7 @@ def get_operator_performance_daily(
             "daily_scores": [
                 {
                     "date": date,
-                    "avg_score": _floor(data["daily_scores"][date]),
+                    "avg_score": calculate_avg_score(data["daily_scores"][date]),
                 }
                 for date in formatted_dates
             ],
