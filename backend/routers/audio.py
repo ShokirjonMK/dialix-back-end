@@ -3,6 +3,8 @@ import logging
 import typing as t  # noqa: F401
 from typing import List, Tuple, Union
 
+import httpx
+
 from celery.result import AsyncResult
 
 from fastapi.responses import JSONResponse
@@ -39,12 +41,11 @@ from backend.utils.analyze import (
 from backend.core.dependencies.database import DatabaseSessionDependency
 from backend.core.dependencies.audio_processing import process_form_data
 
-import httpx
 
 audio_router = APIRouter(tags=["Audios"])
 
 
-def generate_task_id(user_id) -> str:
+def generate_task_id(user_id: uuid.UUID) -> str:
     return f"{user_id}/{uuid.uuid4()}"
 
 
@@ -59,7 +60,7 @@ def get_filterable_values(
 
 
 @audio_router.get("/audios_results")
-async def get_audio_and_results(
+async def get_audio_results(
     db_session: DatabaseSessionDependency,
     current_user: User = Depends(get_current_user),
     record_query_params: RecordQueryParams = Depends(),
@@ -75,6 +76,7 @@ async def get_audio_and_results(
     result_filter_params = result_query_params.model_dump(
         mode="python", exclude_none=True
     )
+
     logging.info(f"{record_filter_params=} {result_filter_params=}")
 
     full_audios = []
@@ -131,13 +133,10 @@ async def get_audio_and_results(
 
 @audio_router.get("/audio/file/{storage_id}")
 async def get_audio_file(request: Request, storage_id: str):
-    # return url to audio file
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"url": f"{request.base_url}uploads/{storage_id}"},
     )
-    # or file itself
-    # return FileResponse(f"uploads/{storage_id}")
 
 
 @audio_router.post("/audio", dependencies=[Depends(get_current_user)])
@@ -179,8 +178,7 @@ def estimate_cost_before_process_from_pbx(
 
 @audio_router.post("/reprocess")
 async def reprocess_data(
-    record: ReprocessRecord,
-    current_user: User = Depends(get_current_user),
+    record: ReprocessRecord, current_user: User = Depends(get_current_user)
 ):
     record_id = record.record_id
     checklist_id = record.checklist_id
