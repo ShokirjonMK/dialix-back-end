@@ -270,12 +270,18 @@ def get_operator_performance(
     results = db.execute(query).all()
 
     operator_scores = {}
+
     for code, name, checklist_result in results:
         score = calculate_score(checklist_result)
         if code in operator_scores:
             operator_scores[code]["scores"].append(score)
         else:
             operator_scores[code] = {"name": name, "scores": [score]}
+
+    logging.info(f"{operator_scores=}")
+
+    for code, data in operator_scores.items():
+        logging.info(f"{code=} => {floor(sum(data['scores']) / len(data['scores']))=}")
 
     return {
         code: {
@@ -346,3 +352,59 @@ def get_operator_performance_daily(
         }
 
     return result
+
+
+def calculate_daily_satisfaction(data):
+    current_date = datetime.now().date()
+    last_month_start = (current_date.replace(day=1) - timedelta(days=1)).replace(day=1)
+    end_of_last_month = current_date.replace(day=1) - timedelta(days=1)
+    current_month_start = current_date.replace(day=1)
+    end_of_current_month = (
+        current_month_start.replace(day=28) + timedelta(days=4)
+    ).replace(day=1) - timedelta(days=1)
+
+    # Initialize dictionaries to hold satisfaction counts for each day
+    last_month_satisfaction = {}
+    current_month_satisfaction = {}
+
+    # Generate string formatted dates for keys
+    last_month_days = [
+        (last_month_start + timedelta(days=i)).strftime("%Y-%m-%d")
+        for i in range((end_of_last_month - last_month_start).days + 1)
+    ]
+    current_month_days = [
+        (current_month_start + timedelta(days=i)).strftime("%Y-%m-%d")
+        for i in range((end_of_current_month - current_month_start).days + 1)
+    ]
+
+    for day in last_month_days:
+        last_month_satisfaction[day] = 0
+    for day in current_month_days:
+        current_month_satisfaction[day] = 0
+
+    # Distribute satisfaction counts into the respective dictionaries
+    for entry in data:
+        date_of_result = datetime.strptime(
+            entry["result_created_at"], "%Y-%m-%dT%H:%M:%S.%f"
+        ).date()
+        date_str = date_of_result.strftime("%Y-%m-%d")
+        if entry["is_customer_satisfied"]:
+            if last_month_start <= date_of_result <= end_of_last_month:
+                if date_str in last_month_satisfaction:
+                    last_month_satisfaction[date_str] += 1
+                else:
+                    logging.warning(
+                        f"Date {date_str} is out of expected range for last month."
+                    )
+            elif current_month_start <= date_of_result <= end_of_current_month:
+                if date_str in current_month_satisfaction:
+                    current_month_satisfaction[date_str] += 1
+                else:
+                    logging.warning(
+                        f"Date {date_str} is out of expected range for current month."
+                    )
+
+    return {
+        "last_month_daily_satisfaction": last_month_satisfaction,
+        "current_month_daily_satisfaction": current_month_satisfaction,
+    }
