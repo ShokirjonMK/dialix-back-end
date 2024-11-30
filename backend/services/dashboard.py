@@ -59,6 +59,34 @@ def get_gender_data(
     return data
 
 
+def get_call_purpose_data(
+    start: datetime, end: datetime, owner_id: UUID, db: Session
+) -> dict[str, int]:
+    record_result_join = join(Record, Result, Record.id == Result.record_id)
+
+    query = (
+        select(
+            case(
+                (
+                    Result.call_purpose.is_(None),
+                    "other",
+                ),
+                else_=func.lower(Result.call_purpose),
+            ).label("purpose"),
+            func.count(Record.id).label("count"),
+        )
+        .select_from(record_result_join)
+        .where(Record.owner_id == owner_id, Record.created_at.between(start, end))
+        .group_by("purpose")
+    )
+
+    results = db.execute(query).all()
+
+    data = {lead: count for lead, count in results}
+
+    return data
+
+
 def get_leads_data(
     start: datetime, end: datetime, owner_id: UUID, db: Session
 ) -> dict[str, int]:
@@ -282,11 +310,6 @@ def get_operator_performance(
             operator_scores[code]["scores"].append(score)
         else:
             operator_scores[code] = {"name": name, "scores": [score]}
-
-    logging.info(f"{operator_scores=}")
-
-    for code, data in operator_scores.items():
-        logging.info(f"{code=} => {floor(sum(data['scores']) / len(data['scores']))=}")
 
     return {
         code: {
