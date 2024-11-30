@@ -29,6 +29,27 @@ async def list_dashboard(
         owner_id=current_user.id,
         db=db_session,
     )
+    leads_data = dashboard_service.get_leads_data(
+        start=start,
+        end=end,
+        owner_id=current_user.id,
+        db=db_session,
+    )
+
+    call_interests_data = dashboard_service.get_call_interests_data(
+        start=start,
+        end=end,
+        owner_id=current_user.id,
+        db=db_session,
+    )
+
+    operator_data = dashboard_service.get_operator_data(
+        start, end, current_user.id, db_session
+    )
+
+    sentiment_data = dashboard_service.get_sentiment_analysis_data(
+        start, end, current_user.id, db_session
+    )
 
     data = db.get_results(owner_id=str(current_user.id))
 
@@ -63,51 +84,27 @@ async def list_dashboard(
     number_of_conversations = db.get_count_of_records(
         owner_id=str(current_user.id)
     ).get("count")
-    operator_data = get_operators_data(owner_id=str(current_user.id))
-
-    male_count = sum(1 for item in data if item["customer_gender"] == "male")
-    female_count = sum(1 for item in data if item["customer_gender"] == "female")
 
     satisfaction_rate_by_month = calculate_daily_satisfaction(data)
 
     content = {
         "full_conversations": full_conversations,
         "total_duration": total_duration,
-        "average_delay": average_delay,
-        "average_duration": average_duration,
-        "satisfaction_rate": satisfaction_rate,
-        "unsatisfaction_rate": unsatisfaction_rate,
-        "number_of_conversations": number_of_conversations,
-        "male_count": male_count,
-        "female_count": female_count,
+        "total_average_delay": average_delay,
+        "total_average_duration": average_duration,
+        "total_satisfaction_rate": satisfaction_rate,
+        "total_unsatisfaction_rate": unsatisfaction_rate,
+        "total_number_of_conversations": number_of_conversations,
+        # new
         "operator_data": operator_data,
         "gender_data": gender_data,
+        "leads_data": leads_data,
+        "call_interests_data": call_interests_data,
+        "sentiment_data": sentiment_data,
         **satisfaction_rate_by_month,
     }
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=content)
-
-
-def get_operators_data(owner_id):
-    operators = db.get_operators(owner_id=str(owner_id))
-    number_of_records = db.get_number_records(owner_id=str(owner_id)).get("count", 0)
-    result = []
-
-    for operator in operators:
-        operator_results = db.get_number_of_operators_records_count(
-            owner_id=str(owner_id), operator_code=str(operator["code"])
-        ).get("count", 0)
-        result.append(
-            {
-                "operator_code": operator["code"],
-                "operator_name": operator["name"],
-                "number_of_records": operator_results,
-                "number_of_records_percentage": math.floor(
-                    (operator_results / number_of_records) * 100
-                ),
-            }
-        )
-    return result
 
 
 def calculate_daily_satisfaction(data):
