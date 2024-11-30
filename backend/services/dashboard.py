@@ -333,8 +333,15 @@ def get_operator_performance_daily(
                 "daily_scores": {d: None for d in formatted_dates},
             }
 
-        daily_scores[code]["daily_scores"][date.strftime("%Y-%m-%d")] = score
-
+        if (
+            temp_score := daily_scores[code]["daily_scores"][date.strftime("%Y-%m-%d")]
+        ) is None:
+            daily_scores[code]["daily_scores"][date.strftime("%Y-%m-%d")] = score
+        else:
+            daily_scores[code]["daily_scores"][date.strftime("%Y-%m-%d")] = (
+                score + temp_score
+            )
+            
     result = {}
 
     def _floor(value: t.Any) -> t.Any:
