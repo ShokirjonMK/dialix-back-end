@@ -51,6 +51,9 @@ async def list_dashboard(
     operator_perfomance_daily = dashboard_service.get_operator_performance_daily(
         start, end, current_user.id, db_session
     )
+    call_purpose_data = dashboard_service.get_call_purpose_data(
+        start, end, current_user.id, db_session
+    )
 
     data = db.get_results(owner_id=str(current_user.id))
 
@@ -104,6 +107,7 @@ async def list_dashboard(
         "sentiment_data": sentiment_data,
         "operator_data": operator_data,
         "operator_perfomance_daily": operator_perfomance_daily,
+        "call_purpose_data": call_purpose_data,
         **satisfaction_rate_by_month,
     }
 
