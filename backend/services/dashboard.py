@@ -23,7 +23,11 @@ def calculate_score(checklist_result: dict) -> float:
         total_fields += len(segment)
         true_values += sum(1 for val in segment.values() if val)
 
-    return (true_values / total_fields) * 100 if total_fields > 0 else 0
+    calculation_result = (true_values / total_fields) * 100 if total_fields > 0 else 0
+
+    logging.info(f"{calculation_result=} for {checklist_result=}")
+
+    return calculation_result
 
 
 def get_gender_data(
