@@ -1,5 +1,3 @@
-import json
-import math
 import logging
 from datetime import datetime, timedelta
 
@@ -35,19 +33,22 @@ async def list_dashboard(
         owner_id=current_user.id,
         db=db_session,
     )
-
+    leads_daily = dashboard_service.get_leads_data_daily(
+        start, end, current_user.id, db_session
+    )
     call_interests_data = dashboard_service.get_call_interests_data(
         start=start,
         end=end,
         owner_id=current_user.id,
         db=db_session,
     )
-
     operator_data = dashboard_service.get_operator_data(
         start, end, current_user.id, db_session
     )
-
     sentiment_data = dashboard_service.get_sentiment_analysis_data(
+        start, end, current_user.id, db_session
+    )
+    operator_perfomance_daily = dashboard_service.get_operator_performance_daily(
         start, end, current_user.id, db_session
     )
 
@@ -96,11 +97,13 @@ async def list_dashboard(
         "total_unsatisfaction_rate": unsatisfaction_rate,
         "total_number_of_conversations": number_of_conversations,
         # new
-        "operator_data": operator_data,
         "gender_data": gender_data,
         "leads_data": leads_data,
+        "leads_daily": leads_daily,
         "call_interests_data": call_interests_data,
         "sentiment_data": sentiment_data,
+        "operator_data": operator_data,
+        "operator_perfomance_daily": operator_perfomance_daily,
         **satisfaction_rate_by_month,
     }
 
