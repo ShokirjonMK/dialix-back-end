@@ -17,8 +17,11 @@ def calculate_percentage(part: int, whole: int) -> int:
 
 
 def calculate_score(checklist_result: dict) -> float:
-    total_fields = 0
     true_values = 0
+    total_fields = 0
+
+    if checklist_result is None:
+        return 0.0
 
     for segment in checklist_result.values():
         total_fields += len(segment)
