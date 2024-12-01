@@ -148,37 +148,6 @@ def get_pending_audios(connection: Connection, owner_id: str):
 
 
 @db_connection_wrapper
-def upsert_checklist(connection: Connection, checklist: dict):
-    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        keys = [key for key in checklist if key not in ["created_at", "updated_at"]]
-        id = checklist["id"]
-
-        cursor.execute(
-            f"""
-            INSERT INTO checklist ({', '.join(keys)}) 
-            VALUES ({', '.join(['%s'] * len(keys))}) 
-            ON CONFLICT (id) DO UPDATE 
-            SET {', '.join([f'{key} = %s' for key in keys])}, 
-                updated_at = NOW() 
-            WHERE checklist.id = %s 
-            RETURNING *
-            """,
-            tuple(
-                [
-                    psycopg2.extras.Json(checklist[key])
-                    if key == "payload"
-                    else checklist[key]
-                    for key in keys
-                ]
-            )
-            * 2
-            + (id,),
-        )
-
-        return dict(cursor.fetchone())
-
-
-@db_connection_wrapper
 def update_checklist(connection: Connection, checklist_id: str, update_data: dict):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         keys = [f"{key} = %s" for key in update_data]
@@ -303,6 +272,8 @@ def get_results(connection: Connection, owner_id: str):
         r.updated_at as result_updated_at,
         r.deleted_at as result_deleted_at,
         r.checklist_result,
+        r.which_course_customer_interested,
+        r.which_platform_customer_found_about_the_course,
         rec.id as record_id,
         rec.title as record_title,
         rec.duration as record_duration,
@@ -366,22 +337,6 @@ def create_topup_transaction(
                 type,
             ),
         )
-        return dict(cursor.fetchone())
-
-
-@db_connection_wrapper
-def upsert_operator(connection: Connection, operator: dict):
-    with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
-        keys = [
-            key for key in operator.keys() if key not in ["created_at", "updated_at"]
-        ]
-        id = operator["id"]
-
-        cursor.execute(
-            f"INSERT INTO operator_data ({', '.join(keys)}) VALUES ({', '.join(['%s'] * len(keys))}) ON CONFLICT (id) DO UPDATE SET {', '.join([f'{key} = %s' for key in keys])}, updated_at = NOW() WHERE operator_data.id = %s RETURNING *",
-            tuple([operator[key] for key in keys]) * 2 + (id,),
-        )
-
         return dict(cursor.fetchone())
 
 
