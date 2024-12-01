@@ -241,7 +241,8 @@ def get_operator_data(
     ).join(
         OperatorData,
         (OperatorData.code.cast(String) == Record.operator_code)
-        & (OperatorData.name == Record.operator_name),
+        & (OperatorData.name == Record.operator_name)
+        & (OperatorData.owner_id == owner_id),
     )
 
     query = (
@@ -294,8 +295,12 @@ def get_operator_performance(
 ) -> dict[str, dict[str, t.Any]]:
     record_result_operator_join = join(
         Record, Result, Record.id == Result.record_id
-    ).join(OperatorData, OperatorData.code.cast(String) == Record.operator_code)
-
+    ).join(
+        OperatorData,
+        (OperatorData.code.cast(String) == Record.operator_code)
+        & (OperatorData.name == Record.operator_name)
+        & (OperatorData.owner_id == owner_id),
+    )
     query = (
         select(
             OperatorData.code,
