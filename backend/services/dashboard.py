@@ -45,7 +45,7 @@ def get_gender_data(
             func.count(Record.id).label("count"),
         )
         .select_from(record_result_join)
-        .where(Record.owner_id == owner_id, Record.created_at.between(start, end))
+        .where((Record.owner_id == owner_id) & (Record.created_at.between(start, end)))
         .group_by(Result.customer_gender)
     )
     results = db.execute(query).all()
@@ -79,7 +79,7 @@ def get_call_purpose_data(
             func.count(Record.id).label("count"),
         )
         .select_from(record_result_join)
-        .where(Record.owner_id == owner_id, Record.created_at.between(start, end))
+        .where((Record.owner_id == owner_id) & (Record.created_at.between(start, end)))
         .group_by("purpose")
     )
 
@@ -107,7 +107,7 @@ def get_leads_data(
             func.count(Record.id).label("count"),
         )
         .select_from(record_result_join)
-        .where(Record.owner_id == owner_id, Record.created_at.between(start, end))
+        .where((Record.owner_id == owner_id) & (Record.created_at.between(start, end)))
         .group_by("platform")
     )
 
@@ -136,9 +136,9 @@ def get_call_interests_data(
         )
         .select_from(record_result_join)
         .where(
-            Record.owner_id == owner_id,
-            Record.created_at.between(start, end),
-            Result.which_course_customer_interested.is_not(None),
+            (Record.owner_id == owner_id)
+            & (Record.created_at.between(start, end))
+            & (Result.which_course_customer_interested.is_not(None))
         )
         .group_by("product")
     )
@@ -162,7 +162,9 @@ def get_sentiment_analysis_data(
         query = (
             select(getattr(Result, sentiment_field), func.count(Record.id))
             .select_from(record_result_join)
-            .where(Record.owner_id == owner_id, Record.created_at.between(start, end))
+            .where(
+                (Record.owner_id == owner_id) & (Record.created_at.between(start, end))
+            )
             .group_by(getattr(Result, sentiment_field))
         )
         return {sentiment: count for sentiment, count in db.execute(query).all()}
@@ -202,7 +204,7 @@ def get_leads_data_daily(
             func.count(Record.id).label("count"),
         )
         .select_from(record_result_join)
-        .where(Record.owner_id == owner_id, Record.created_at.between(start, end))
+        .where((Record.owner_id == owner_id) & (Record.created_at.between(start, end)))
         .group_by("date", "platform")
     )
 
@@ -236,7 +238,11 @@ def get_operator_data(
 ) -> list[dict]:
     record_result_operator_join = join(
         Record, Result, Record.id == Result.record_id
-    ).join(OperatorData, OperatorData.code.cast(String) == Record.operator_code)
+    ).join(
+        OperatorData,
+        (OperatorData.code.cast(String) == Record.operator_code)
+        & (OperatorData.name == Record.operator_name),
+    )
 
     query = (
         select(
@@ -250,8 +256,7 @@ def get_operator_data(
         )
         .select_from(record_result_operator_join)
         .where(
-            Record.owner_id == owner_id,
-            Record.created_at.between(start, end),
+            (Record.owner_id == owner_id) & (Record.created_at.between(start, end)),
         )
         .group_by(OperatorData.id, OperatorData.code, OperatorData.name)
     )
@@ -299,8 +304,7 @@ def get_operator_performance(
         )
         .select_from(record_result_operator_join)
         .where(
-            Record.owner_id == owner_id,
-            Record.created_at.between(start, end),
+            (Record.owner_id == owner_id) & (Record.created_at.between(start, end)),
         )
     )
 
@@ -339,10 +343,7 @@ def get_operator_performance_daily(
             Result.checklist_result,
         )
         .select_from(record_result_operator_join)
-        .where(
-            Record.owner_id == owner_id,
-            Record.created_at.between(start, end),
-        )
+        .where((Record.owner_id == owner_id) & (Record.created_at.between(start, end)))
     )
 
     results = db.execute(query).all()
