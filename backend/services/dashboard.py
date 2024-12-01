@@ -253,9 +253,7 @@ def get_operator_data(
             Record.owner_id == owner_id,
             Record.created_at.between(start, end),
         )
-        .group_by(
-            OperatorData.id, OperatorData.code, OperatorData.name, OperatorData.owner_id
-        )
+        .group_by(OperatorData.id, OperatorData.code, OperatorData.name)
     )
 
     def seconds_to_str(milliseconds: Decimal) -> str:

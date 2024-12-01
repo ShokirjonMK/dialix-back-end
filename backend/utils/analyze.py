@@ -113,7 +113,7 @@ def analyze_data_handler(
         )
         operator_name: t.Optional[str] = None
 
-        if is_filename_in_pbx_format:
+        if operator_code is not None:
             operator = (
                 db.get_operator_name_by_code(owner_id=owner_id, code=operator_code)
                 or {}
