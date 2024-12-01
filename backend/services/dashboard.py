@@ -240,7 +240,7 @@ def get_operator_data(
 
     query = (
         select(
-            OperatorData.id,
+            OperatorData.id.cast(String),
             OperatorData.code,
             OperatorData.name,
             func.count(Record.id),
@@ -253,7 +253,9 @@ def get_operator_data(
             Record.owner_id == owner_id,
             Record.created_at.between(start, end),
         )
-        .group_by(OperatorData.id, OperatorData.code, OperatorData.owner_id)
+        .group_by(
+            OperatorData.id, OperatorData.code, OperatorData.name, OperatorData.owner_id
+        )
     )
 
     def seconds_to_str(milliseconds: Decimal) -> str:
@@ -263,6 +265,7 @@ def get_operator_data(
 
     return [
         {
+            "operator_id": operator_id,
             "operator_code": operator_code,
             "operator_name": operator_name,
             "recordings_count": recordings_count,
@@ -272,7 +275,7 @@ def get_operator_data(
             "avg_score": operator_scores.get(operator_code, {}).get("avg_score", 0),
         }
         for (
-            _,
+            operator_id,
             operator_code,
             operator_name,
             recordings_count,
