@@ -338,7 +338,12 @@ def get_operator_performance_daily(
 ) -> dict[str, list[dict]]:
     record_result_operator_join = join(
         Record, Result, Record.id == Result.record_id
-    ).join(OperatorData, OperatorData.code.cast(String) == Record.operator_code)
+    ).join(
+        OperatorData,
+        (OperatorData.code.cast(String) == Record.operator_code)
+        & (OperatorData.name == Record.operator_name)
+        & (OperatorData.owner_id == owner_id),
+    )
 
     query = (
         select(
