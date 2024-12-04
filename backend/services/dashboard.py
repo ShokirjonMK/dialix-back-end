@@ -34,6 +34,66 @@ def calculate_score(checklist_result: dict) -> float:
     return calculation_result
 
 
+def get_call_analytics(
+    start: datetime, end: datetime, owner_id: UUID, db: Session
+) -> dict[str, t.Any]:
+    record_operator_join = join(
+        Record, OperatorData, OperatorData.code.cast(String) == Record.operator_code
+    )
+
+    overall_query = (
+        select(
+            func.count(Record.id).label("total_calls"),
+            func.sum(Record.duration).label("total_minutes"),
+            (func.sum(Record.duration) / func.count(Record.id)).label(
+                "average_minutes"
+            ),
+        )
+        .select_from(record_operator_join)
+        .where(Record.owner_id == owner_id, Record.created_at.between(start, end))
+    )
+
+    daily_query = (
+        select(
+            func.date(Record.created_at).label("date"),
+            func.count(Record.id).label("daily_calls"),
+        )
+        .select_from(record_operator_join)
+        .where(Record.owner_id == owner_id, Record.created_at.between(start, end))
+        .group_by(func.date(Record.created_at))
+        .order_by("date")
+    )
+
+    overall_result = db.execute(overall_query).one()
+    daily_results = db.execute(daily_query).all()
+
+    total_calls = overall_result.total_calls or 0
+    total_minutes = overall_result.total_minutes or 0
+    average_minutes = overall_result.average_minutes or 0
+
+    all_dates = set(start + timedelta(days=x) for x in range((end - start).days + 1))
+    daily_data = {d: 0 for d in all_dates}
+
+    for date, daily_calls in daily_results:
+        daily_data[date] = daily_calls
+
+    return {
+        "total_calls": total_calls,
+        "total_minutes": float(total_minutes),
+        "average_minutes": float(average_minutes),
+        "daily_data": sorted(
+            [
+                {
+                    "date": datetime.strftime(date, "%Y-%m-%d"),
+                    "daily_calls": daily_data[date],
+                }
+                for date in daily_data.keys()
+            ],
+            key=lambda data: data["date"],
+        ),
+    }
+
+
 def get_gender_data(
     start: datetime, end: datetime, owner_id: UUID, db: Session
 ) -> dict[str, list[dict]]:

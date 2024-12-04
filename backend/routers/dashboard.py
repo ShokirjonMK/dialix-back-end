@@ -1,5 +1,5 @@
-import logging
-from datetime import datetime, timedelta
+import logging  # noqa: F401
+from datetime import datetime
 
 from fastapi.responses import JSONResponse
 from fastapi import Depends, APIRouter, status
@@ -52,6 +52,9 @@ async def list_dashboard(
         start, end, current_user.id, db_session
     )
     call_purpose_data = dashboard_service.get_call_purpose_data(
+        start, end, current_user.id, db_session
+    )
+    call_analytics = dashboard_service.get_call_analytics(
         start, end, current_user.id, db_session
     )
 
@@ -108,6 +111,7 @@ async def list_dashboard(
         "operator_data": operator_data,
         "operator_perfomance_daily": operator_perfomance_daily,
         "call_purpose_data": call_purpose_data,
+        "call_analytics": call_analytics,
         **satisfaction_rate_by_month,
     }
 
