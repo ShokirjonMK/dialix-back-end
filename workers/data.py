@@ -71,13 +71,7 @@ def upsert_data(self: PredictTask, *args, **kwargs):
             else existing_checklist_response
         )
 
-        db.upsert_record(
-            record={
-                **existing_record,
-                "status": "COMPLETED",
-                "bitrix_result": json.dumps(task_result.get("bitrix_result")),
-            }
-        )
+        db.upsert_record(record={**existing_record, "status": "COMPLETED"})
 
         if isinstance(checklist_response, str):
             checklist_response = json.loads(

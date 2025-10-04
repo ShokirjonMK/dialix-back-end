@@ -329,4 +329,5 @@ celery.task(base=PredictTask)
 
 celery.conf.task_routes = {
     "backend.tasks.pbx.process_pbx_call_task": {"queue": "api"},
+    "backend.tasks.pbx.update_bitrix_results": {"queue": "api"},
 }

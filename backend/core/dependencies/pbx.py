@@ -50,7 +50,6 @@ def get_pbx_credentials(
     current_user: User = Depends(get_current_user),
     raise_exc: t.Optional[bool] = True,
 ) -> PbxCredentialsFull:
-    logging.info("PBX cred works!")
     pbx_credentials = db_session.scalar(
         select(PbxCredentialsDb).where(PbxCredentialsDb.owner_id == current_user.id)
     )
