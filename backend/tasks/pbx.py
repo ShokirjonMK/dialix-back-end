@@ -3,7 +3,6 @@ import os
 import logging
 import typing as t  # noqa: F401
 
-from httpx import HTTPStatusError
 
 from fastapi import UploadFile
 
@@ -16,39 +15,7 @@ from backend.utils.pbx import (
 )
 from backend.services.user import get_user_by_id
 from backend.utils.analyze import analyze_data_handler
-from backend.services.pbx import (
-    get_no_bitrix_processed_calls,
-    get_bitrix_result_by_call_id,
-)
 from backend.core.dependencies.database import get_db_session
-from backend.utils.bitrix import update_bulk_deals_by_phones
-
-
-@celery_app.task(autoretry_for=[HTTPStatusError], max_retries=10, retry_backoff=True)
-def update_bitrix_results(*args, **kwargs):
-    logging.info(f"{args=} {kwargs=}")
-
-    owner_id = kwargs.get("owner_id")
-    webhook_url = kwargs.get("webhook_url")
-    logging.info(f"{webhook_url=}")
-    db_session = next(get_db_session())
-
-    phone_numbers = get_no_bitrix_processed_calls(db_session, owner_id)
-
-    logging.info(
-        f"Total number of loaded phone numbers for this task: {len(phone_numbers)}"
-    )
-
-    if phone_numbers is None or len(phone_numbers) == 0:
-        return {"success": True}
-
-    phone_numbers_formatted = [row[0] for row in phone_numbers]
-
-    update_bulk_deals_by_phones(
-        webhook_url, phone_numbers_formatted, db_session, owner_id
-    )
-
-    return {"success": True}
 
 
 @celery_app.task
@@ -103,11 +70,6 @@ def process_pbx_call_task(*args, **kwargs):
             db_session = next(get_db_session())
             current_user = get_user_by_id(db_session, user_id)
 
-            bitrix_result = get_bitrix_result_by_call_id(
-                db_session, current_user.id, uuid
-            )
-            logging.info(f"Processing call from pbx({uuid=}): {bitrix_result=}")
-
             response = analyze_data_handler(
                 db_session=db_session,
                 processed_data=processed_data,
@@ -115,12 +77,13 @@ def process_pbx_call_task(*args, **kwargs):
                 _operator_code=call_info["caller_id_number"],
                 _call_type=call_info["accountcode"],
                 _destination_number=call_info["destination_number"],
-                _bitrix_result=bitrix_result,
             )
 
             logging.info(f"Analysis endpoint's response: {response}")
 
-        # cleanup
+        return {"success": True, "response": response.status_code}
+
+    finally:
         if os.path.exists(download_file_path):
             try:
                 os.remove(download_file_path)
@@ -129,7 +92,3 @@ def process_pbx_call_task(*args, **kwargs):
                 logging.error(
                     f"Failed to delete file: {download_file_path}. Error: {exc}"
                 )
-
-        return {"success": True, "response": response.status_code}
-    except Exception as exc:
-        logging.error(f"Unexpected exception occurred: {exc=}")

@@ -22,6 +22,9 @@ from utils.data_manipulation import (
 )
 import backend.db as db
 from utils.mohirai import mohirAI
+from backend.utils.bitrix import get_deals_by_phone
+from backend.core.dependencies.database import get_db_session
+from backend.core.dependencies.bitrix import get_bitrix_credentials_celery
 
 checklist_prompt = """
     You are given a conversation between a call center operator and a potential customer. 
@@ -158,6 +161,7 @@ def api_processing(self: PredictTask, **kwargs):
     general = task.get("general")
     record_payload = record.get("payload", {})
     folder_name = task.get("folder_name", "")
+    client_phone_number = task.get("client_phone_number")
 
     if not task or not record:
         logging.error("Task data is not provided")
@@ -267,4 +271,21 @@ def api_processing(self: PredictTask, **kwargs):
             f"Will not process via checklist for {file_path=} coz {checklist_id=}"
         )
 
-    return {"general_response": json_data, "checklist_response": checklist_response}
+    bitrix_result = None
+
+    if client_phone_number and record["bitrix_result"] is None:
+        db_session = next(get_db_session())
+        bitrix_credentials = get_bitrix_credentials_celery(
+            db_session, owner_id=record["owner_id"]
+        )
+        if bitrix_credentials:
+            contact_name, result = get_deals_by_phone(
+                bitrix_credentials.webhook_url, client_phone_number
+            )
+            bitrix_result = {"customer_name": contact_name, "deals": result}
+
+    return {
+        "general_response": json_data,
+        "checklist_response": checklist_response,
+        "bitrix_result": bitrix_result,
+    }

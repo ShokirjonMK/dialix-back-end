@@ -47,7 +47,6 @@ def analyze_data_handler(
     _operator_code: t.Optional[str] = None,
     _call_type: t.Optional[str] = None,
     _destination_number: t.Optional[str] = None,
-    _bitrix_result: t.Optional[dict] = None,
 ):
     responses = []
 
@@ -132,7 +131,6 @@ def analyze_data_handler(
             "duration": duration * 1000,
             "storage_id": storage_id,
             "client_phone_number": client_phone_number,
-            "bitrix_result": _bitrix_result,
         }
 
         audio_record = db.upsert_record(record=record)

@@ -49,12 +49,10 @@ def upsert_record(connection: Connection, record):
 
         values = [
             psycopg2.extras.Json(record[key])
-            if key in RECORD_JSON_FIELDS
-            and (isinstance(record[key], dict) or isinstance(record[key], list))
+            if key in RECORD_JSON_FIELDS and isinstance(record[key], dict)
             else record[key]
             for key in keys
         ]
-        logging.info(f"UPSERT {values=}")
 
         insert_query = f"""
             INSERT INTO record ({', '.join(keys)})
@@ -153,12 +151,7 @@ def get_pending_audios(connection: Connection, owner_id: str):
 def update_checklist(connection: Connection, checklist_id: str, update_data: dict):
     with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
         keys = [f"{key} = %s" for key in update_data]
-        values = [
-            value
-            if not (isinstance(value, list) or isinstance(value, dict))
-            else psycopg2.extras.Json(value)
-            for value in update_data.values()
-        ]
+        values = list(update_data.values())
 
         cursor.execute(
             f"""

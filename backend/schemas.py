@@ -12,6 +12,7 @@ from pydantic import (
     ConfigDict,
     model_validator,
     StringConstraints,
+    SecretStr,
 )
 
 ChecklistPayload = t.Union[t.List[str], t.Dict[str, t.List[str]]]
@@ -368,26 +369,3 @@ class FinalCallStatusResponse(BaseModel):
 
     client_name: t.Optional[str] = None
     deals: t.Optional[list[Deal]] = []
-
-
-class PbxCallSchema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-
-    call_id: UUID
-
-    caller_id_name: str
-    caller_id_number: str
-    destination_number: str
-
-    start_stamp: int
-    end_stamp: int
-
-    duration: int
-    user_talk_time: int
-
-    call_type: str
-
-    was_processed_from_bitrix: bool
-    bitrix_result: t.Optional[dict | list]

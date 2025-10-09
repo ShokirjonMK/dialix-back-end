@@ -178,32 +178,3 @@ class BitrixCredentials(Base):
         unique=True,
     )
     webhook_url = Column(String, unique=True, nullable=False)
-
-
-class PbxCall(Base):
-    __tablename__ = "pbx_calls"
-
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
-
-    owner_id = Column(
-        PostgresUUID(as_uuid=True),
-        ForeignKey("account.id"),
-        nullable=False,
-    )
-
-    call_id = Column(PostgresUUID(as_uuid=True), unique=True, nullable=False)
-
-    caller_id_name = Column(String)
-    caller_id_number = Column(String)
-    destination_number = Column(String)
-
-    start_stamp = Column(Integer)
-    end_stamp = Column(Integer)
-
-    duration = Column(Integer)
-    user_talk_time = Column(Integer)
-
-    call_type = Column(String)
-
-    bitrix_result = Column(JSON, nullable=True)
-    was_processed_from_bitrix = Column(Boolean, default=False)

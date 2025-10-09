@@ -5,9 +5,6 @@ from typing import List, Tuple, Union
 
 import httpx
 
-from redis import Redis
-from decouple import config
-
 from celery.result import AsyncResult
 
 from fastapi.responses import JSONResponse
@@ -22,7 +19,6 @@ from backend.schemas import (
     PBXCallHistoryRequest,
     RecordOrderQueries,
     ResultOrderQueries,
-    PbxCallSchema,
 )
 from backend.core import settings
 from workers.data import upsert_data
@@ -30,19 +26,12 @@ from utils.encoder import adapt_json
 from workers.api import api_processing
 from utils.storage import get_stream_url
 from backend.utils.pbx import filter_calls
-from backend.tasks.pbx import update_bitrix_results
 from backend.services.record import (
     get_all_record_titles,
     get_filterable_values_for_record,
 )
-from backend.services.pbx import (
-    sync_pbx_calls,
-    get_calls_between_interval,
-    get_total_interval,
-)
 from backend.services.result import get_filterable_values_for_result
 from backend.core.dependencies.user import get_current_user, CurrentUser
-from backend.core.dependencies.bitrix import BitrixCredentialsDependency
 from backend.core.dependencies.pbx import get_pbx_credentials, PbxCredentialsDependency
 from backend.utils.analyze import (
     analyze_data_handler,
@@ -51,11 +40,9 @@ from backend.utils.analyze import (
 )
 from backend.core.dependencies.database import DatabaseSessionDependency
 from backend.core.dependencies.audio_processing import process_form_data
-from backend.utils.shortcuts import models_to_dict
+
 
 audio_router = APIRouter(tags=["Audios"])
-ONE_WEEK_SECONDS: int = 7 * 24 * 60 * 60
-redis_conn = Redis().from_url(config("REDIS_URL"), decode_responses=True)
 
 
 def generate_task_id(user_id: uuid.UUID) -> str:
@@ -75,25 +62,14 @@ def get_filterable_values(
 @audio_router.get("/audios_results")
 async def get_audio_results(
     db_session: DatabaseSessionDependency,
-    bitrix_credentials: BitrixCredentialsDependency,
     current_user: User = Depends(get_current_user),
     record_query_params: RecordQueryParams = Depends(),
     result_query_params: ResultQueryParams = Depends(),
     record_order_query_params: RecordOrderQueries = Depends(),
     result_order_query_params: ResultOrderQueries = Depends(),
-    start_stamp_from: t.Optional[int] = None,
-    end_stamp_to: t.Optional[int] = None,
-    bitrix_result_should_exist: t.Optional[bool] = False,
-) -> JSONResponse:
-    if start_stamp_from > end_stamp_to or start_stamp_from == end_stamp_to:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Wrong interval, start should be less than end, interval length "
-                "should be less than or equal 1 WEEK, refer to PBX docs"
-            ),
-        )
-
+    start_stamp_from: t.Optional[str] = None,
+    end_stamp_to: t.Optional[str] = None,
+):
     record_filter_params = record_query_params.model_dump(
         mode="python", exclude_none=True
     )
@@ -148,20 +124,10 @@ async def get_audio_results(
     }
 
     if start_stamp_from and end_stamp_to:
-        existing_record_titles: list[str] = get_all_record_titles(
-            db_session, current_user.id
-        )
-        response["pbx_calls"] = filter_calls(
-            get_pbx_call_history(
-                db_session, current_user, start_stamp_from, end_stamp_to
-            ),
-            existing_record_titles,
-            bitrix_result_should_exist,
+        response["pbx_calls"] = get_pbx_call_history(
+            db_session, current_user, start_stamp_from, end_stamp_to
         )
 
-        update_bitrix_results.delay(
-            owner_id=current_user.id, webhook_url=bitrix_credentials.webhook_url
-        )
     return JSONResponse(status_code=status.HTTP_200_OK, content=adapt_json(response))
 
 
@@ -286,7 +252,10 @@ async def reprocess_data(
         task_id=task_id,
     )
 
-    response_data = {"id": task.id, "status": "PENDING"}
+    response_data = {
+        "id": task.id,
+        "status": "PENDING",
+    }
 
     return JSONResponse(status_code=200, content=response_data)
 
@@ -298,141 +267,25 @@ async def get_pending_audios(current_user: User = Depends(get_current_user)):
     return JSONResponse(status_code=200, content=data)
 
 
-def get_pbx_call_history(
-    db_session: DatabaseSessionDependency,
-    current_user,
-    start_stamp_from: int,
-    end_stamp_to: int,
-):
+def get_pbx_call_history(db_session, current_user, start_stamp_from, end_stamp_to):
     pbx_credentials = get_pbx_credentials(db_session, current_user, raise_exc=False)
 
     if not pbx_credentials:
         logging.warning(f"No pbx credentials are found for {current_user.username=}")
         return []
 
-    logging.info(f"Got pbx credentials: {pbx_credentials}")
+    existing_record_titles: list[str] = get_all_record_titles(
+        db_session, current_user.id
+    )
 
+    logging.info("Preparing and sending request ...")
     url = f"{settings.PBX_API_URL.format(domain=pbx_credentials.domain)}/mongo_history/search.json"
 
-    calls = load_pbx_calls(
-        current_user.id,
-        url,
-        db_session,
-        pbx_credentials,
-        start_stamp_from,
-        end_stamp_to,
-    )
-    logging.info(f"Number of calls loaded {len(calls)}")
-
-    redis_conn.set(
-        f"last_loaded_interval:{current_user.id}",
-        f"{start_stamp_from}:{end_stamp_to}",
-        ex=2 * 60,  # 2 minute
-    )
-    return models_to_dict(PbxCallSchema, calls)
-
-
-def load_pbx_calls(
-    owner_id: uuid.UUID,
-    url: str,
-    db_session: DatabaseSessionDependency,
-    pbx_credentials: PbxCredentialsDependency,
-    S: int,
-    E: int,
-):
-    """
-    I know, it is mess. But "CTO"(quote unquote),
-    ignored my opinion. Proposed this (cutting uneccessary intervals).
-    Forgive me if you are debugging this code, I have not have any choice.
-    """
-    global redis_conn
-
-    def api(s: int, e: int):
-        if (e - s) > ONE_WEEK_SECONDS:
-            logging.warning(f"Difference of {s=} and {e=} is greater than one week.")
-        calls = pbx_fetch(url, pbx_credentials, s, e)
-        logging.info(f"Number of calls loaded from API {len(calls)} for {s=} {e=}")
-        return calls
-
-    def db(s: int, e: int):
-        return get_calls_between_interval(db_session, owner_id, s, e)
-
-    def sync(api_data):
-        return sync_pbx_calls(db_session, owner_id, api_data)
-
-    intervals_from_redis = redis_conn.get(f"last_loaded_interval:{owner_id}")
-    logging.info(f"{type(intervals_from_redis)=}")
-
-    if intervals_from_redis is not None:
-        _S, _E = map(int, intervals_from_redis.split(":"))
-        logging.info(f"Last loaded value is loaded from redis {_S=} {_E=}")
-
-        if S == _S and E == _E:
-            logging.info(f"Request was served just before, loading from db {S=} {E=}")
-            return db(S, E)
-
-    db_intervals = get_total_interval(db_session, owner_id)
-    logging.info(f"Loaded {db_intervals=}")
-
-    if db_intervals == (None, None):
-        logging.info("[0] No interval found in db, cold start")
-        api_data = api(S, E)
-        sync(api_data)
-        return db(S, E)
-
-    MS, ME = db_intervals
-
-    if MS <= S < E <= ME:
-        logging.info(
-            f"[1] {MS=} {ME=} {S=} {E=} Ideal interval overlap, loading all from db"
-        )
-        return db(S, E)
-
-    if S < MS < E:
-        logging.info(f"[2] {MS=} {ME=} {S=} {E=} Partial overlap, api+db loading")
-        api_data = api(S, MS)
-        sync(api_data)
-        return db(S, E)
-
-    if S < ME < E:
-        logging.info(f"[3] {MS=} {ME=} {S=} {E=} Partial overlap, api+db loading")
-        api_data = api(S, ME)
-        sync(api_data)
-        return db(S, ME)
-
-    if ME < S:
-        logging.info(
-            f"[4] {MS=} {ME=} {S=} {E=} Did not match, extending contigious area"
-        )
-        args = (ME, E)
-        if E - ME > ONE_WEEK_SECONDS:
-            logging.info(
-                f"Length of interval {E=} and {ME=} is greater than 1 WEEK, settings args {S=} {E=}"
-            )
-            args = (S, E)
-
-        api_data = api(*args)
-        sync(api_data)
-        return db(S, E)
-
-    if E < MS:
-        logging.info(
-            f"[5] {MS=} {ME=} {S=} {E=} Did not match, extending contigious area"
-        )
-        args = (S, MS)
-        if MS - S > ONE_WEEK_SECONDS:
-            logging.info(
-                f"Length of interval {E=} and {ME=} is greater than 1 WEEK, settings args {S=} {E=}"
-            )
-            args = (S, E)
-        api_data = api(*args)
-        sync(api_data)
-        return db(S, E)
-
-
-def pbx_fetch(url: str, pbx_credentials: PbxCredentialsDependency, S: int, E: int):
     with httpx.Client() as client:
-        filter_data = {"start_stamp_from": S, "end_stamp_to": E}
+        filter_data = {
+            "start_stamp_from": start_stamp_from,
+            "end_stamp_to": end_stamp_to,
+        }
 
         response = client.post(
             url,
@@ -453,4 +306,8 @@ def pbx_fetch(url: str, pbx_credentials: PbxCredentialsDependency, S: int, E: in
                 detail=json_response["comment"],
             )
 
-        return json_response["data"]
+        logging.info(f"Total number of calls is {len(json_response['data'])}")
+        filtered_calls = filter_calls(json_response["data"], existing_record_titles)
+        logging.info(f"Filtering is done total number of calls={len(filtered_calls)}")
+
+        return filtered_calls

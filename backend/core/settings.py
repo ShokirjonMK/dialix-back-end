@@ -7,6 +7,7 @@ from decouple import config
 ###
 CORS_ALLOWED_ORIGINS: list[str] = [
     "https://dialix.org",
+    "https://new.dialix.org",
     "https://dev.dialix.org",
     # local development
     "http://localhost:3000",

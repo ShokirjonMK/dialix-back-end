@@ -12,19 +12,13 @@ from backend.core import settings
 
 
 def filter_calls(
-    calls: list[dict],
-    existing_record_ids: t.Optional[list[UUID]] = [],
-    bitrix_result_should_exist: t.Optional[bool] = False,
+    calls: list[dict], existing_record_ids: t.Optional[list[UUID]] = []
 ) -> list[dict]:
     logging.info(f"Filtering recordings: {len(calls)=} and {len(existing_record_ids)=}")
     return list(
         filter(
-            lambda entry: f"call-{entry['call_id']}.mp3" not in existing_record_ids
-            and (
-                entry["bitrix_result"] is not None
-                if bitrix_result_should_exist
-                else True
-            ),
+            lambda entry: entry["user_talk_time"] >= 10
+            and f"call-{entry['uuid']}.mp3" not in existing_record_ids,
             calls,
         )
     )
