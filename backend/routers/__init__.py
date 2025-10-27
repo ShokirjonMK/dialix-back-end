@@ -7,6 +7,10 @@ from backend.routers.bitrix import bitrix_router
 from backend.routers.operator import operator_router
 from backend.routers.dashboard import dashboard_router
 from backend.routers.checklist import checklist_router
+from backend.routers.settings import settings_router
+from backend.routers.ai_chat import ai_chat_router
+from backend.routers.activity_log import activity_log_router
+from backend.routers.company import company_router
 
 __all__ = ["routers"]
 
@@ -20,4 +24,9 @@ routers: list[APIRouter] = [
     # integrations
     pbx_router,
     bitrix_router,
+    # new features
+    settings_router,
+    ai_chat_router,
+    activity_log_router,
+    company_router,
 ]
