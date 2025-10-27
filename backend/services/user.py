@@ -2,13 +2,19 @@ import copy
 import logging
 import typing as t
 from uuid import UUID
+from typing import Optional
 
 from sqlalchemy.orm import Session
-from sqlalchemy import select, exists
+from sqlalchemy import select, exists, update, or_, func
 
 from backend.utils.auth import hashify
 from backend.utils.shortcuts import raise_400
-from backend.database.models import Account, PbxCredentials, BitrixCredentials
+from backend.database.models import (
+    Account,
+    PbxCredentials,
+    BitrixCredentials,
+    Transaction,
+)
 
 USER_CREDENTIALS: tuple[tuple[str, t.Any]] = (
     ("pbx_credentials", PbxCredentials),
@@ -66,3 +72,106 @@ def get_user_by_username(db_session: Session, username: str) -> Account:
 
 def get_user_by_id(db_session: Session, user_id: UUID) -> Account:
     return db_session.scalar(select(Account).where(Account.id == user_id))
+
+
+def update_user_info(db_session: Session, user_id: UUID, update_data: dict) -> Account:
+    """User ma'lumotini yangilash"""
+    db_session.execute(
+        update(Account)
+        .where(Account.id == user_id)
+        .values(**update_data, updated_at=func.now())
+    )
+    db_session.commit()
+    return get_user_by_id(db_session, user_id)
+
+
+def delete_user(db_session: Session, user_id: UUID):
+    """User'ni o'chirish (soft delete)"""
+    db_session.execute(
+        update(Account).where(Account.id == user_id).values(is_active=False)
+    )
+    db_session.commit()
+    logging.info(f"User {user_id} deactivated")
+
+
+def search_users(
+    db_session: Session,
+    query_str: str = None,
+    role: str = None,
+    company_id: UUID = None,
+    is_active: bool = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[Account]:
+    """User'lar ichida qidirish"""
+    search_query = select(Account)
+
+    if query_str:
+        search_query = search_query.where(
+            or_(
+                Account.username.ilike(f"%{query_str}%"),
+                Account.email.ilike(f"%{query_str}%"),
+                Account.company_name.ilike(f"%{query_str}%"),
+            )
+        )
+
+    if role:
+        search_query = search_query.where(Account.role == role)
+    if company_id:
+        search_query = search_query.where(Account.company_id == company_id)
+    if is_active is not None:
+        search_query = search_query.where(Account.is_active == is_active)
+
+    search_query = search_query.limit(limit).offset(offset)
+
+    result = db_session.execute(search_query)
+    return list(result.scalars().all())
+
+
+def reset_user_password(db_session: Session, user_id: UUID, new_password: str):
+    """User parolini qayta tiklash"""
+    hashed = hashify(new_password)
+    db_session.execute(
+        update(Account)
+        .where(Account.id == user_id)
+        .values(password=hashed, updated_at=func.now())
+    )
+    db_session.commit()
+    logging.info(f"Password reset for user {user_id}")
+
+
+def block_user(db_session: Session, user_id: UUID):
+    """User'ni bloklash"""
+    db_session.execute(
+        update(Account)
+        .where(Account.id == user_id)
+        .values(is_blocked=True, updated_at=func.now())
+    )
+    db_session.commit()
+    logging.info(f"User {user_id} blocked")
+
+
+def unblock_user(db_session: Session, user_id: UUID):
+    """User'ni blokdan ochirish"""
+    db_session.execute(
+        update(Account)
+        .where(Account.id == user_id)
+        .values(is_blocked=False, updated_at=func.now())
+    )
+    db_session.commit()
+    logging.info(f"User {user_id} unblocked")
+
+
+def get_user_transaction_history(
+    db_session: Session, user_id: UUID, limit: int = 100
+) -> list[Transaction]:
+    """User'ning transaction tarixini olish"""
+    query = (
+        select(Transaction)
+        .where(Transaction.owner_id == user_id)
+        .order_by(Transaction.created_at.desc())
+        .limit(limit)
+    )
+
+    result = db_session.execute(query)
+    return list(result.scalars().all())

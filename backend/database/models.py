@@ -11,6 +11,7 @@ from sqlalchemy import (
     TEXT,
     Integer,
     text,
+    relationship,
 )
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 
@@ -26,9 +27,19 @@ class Account(Base):
     username = Column(String, nullable=False, unique=True)
     password = Column(String, nullable=False)
     role = Column(String, nullable=False)
-    company_name = Column(String, nullable=False)
+    company_name = Column(String, nullable=False)  # LEGACY - use company_id instead
+    company_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("company.id"), nullable=True
+    )  # NEW
+    is_active = Column(Boolean, server_default="true")  # NEW
+    is_blocked = Column(Boolean, server_default="false")  # NEW
+    last_activity = Column(TIMESTAMP, nullable=True)  # NEW
+    preferred_language = Column(String, default="uz")  # NEW
     created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
     updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+
+    # Relationships
+    company_rel = relationship("Company", back_populates="users")
 
 
 class Record(Base):
@@ -178,3 +189,159 @@ class BitrixCredentials(Base):
         unique=True,
     )
     webhook_url = Column(String, unique=True, nullable=False)
+
+
+class Company(Base):
+    """Company Management uchun model"""
+
+    __tablename__ = "company"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+    name = Column(String, nullable=False, unique=True)
+    description = Column(TEXT, nullable=True)
+    is_active = Column(Boolean, server_default="true", nullable=False)
+    parent_company_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("company.id"), nullable=True
+    )
+    hierarchy_level = Column(Integer, server_default="0", nullable=False)
+    settings = Column(JSON, nullable=True)  # Company-specific settings
+    balance = Column(BigInteger, server_default="0", nullable=False)
+
+    created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+    deleted_at = Column(TIMESTAMP, nullable=True)
+
+    # Relationships
+    users = relationship("Account", back_populates="company_rel")
+    administrators = relationship("CompanyAdministrator", back_populates="company")
+
+
+class CompanyAdministrator(Base):
+    """Kompaniya adminlari"""
+
+    __tablename__ = "company_administrator"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+    company_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("company.id"), nullable=False
+    )
+    user_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
+    )
+    permissions = Column(JSON, nullable=True)  # {"can_manage_users": true, ...}
+
+    created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+
+    # Relationships
+    company = relationship("Company", back_populates="administrators")
+
+
+class UserCompanyHistory(Base):
+    """User o'tkazilgan kompaniyalar tarixi"""
+
+    __tablename__ = "user_company_history"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
+    )
+    company_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("company.id"), nullable=False
+    )
+    action = Column(String, nullable=False)  # "transferred", "joined", "left"
+    balance_at_time = Column(BigInteger, nullable=True)
+
+    created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+
+
+class ActivityLog(Base):
+    """CRUD operations uchun audit log"""
+
+    __tablename__ = "activity_log"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
+    )
+    action = Column(String, nullable=False)  # "CREATE", "UPDATE", "DELETE", "VIEW"
+    resource_type = Column(
+        String, nullable=False
+    )  # "record", "checklist", "operator", "account"
+    resource_id = Column(PostgresUUID(as_uuid=True), nullable=False)
+    details = Column(
+        JSON, nullable=True
+    )  # {"field": "value", "old_value": "...", "new_value": "..."}
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(TEXT, nullable=True)
+
+    created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+
+
+class AIChatSession(Base):
+    """AI Chat interface uchun session"""
+
+    __tablename__ = "ai_chat_session"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("account.id"), nullable=False
+    )
+    record_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("record.id"), nullable=False
+    )
+    session_data = Column(
+        JSON, nullable=True
+    )  # {"questions_asked": 5, "context": {...}}
+    is_active = Column(Boolean, server_default="true", nullable=False)
+
+    created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+
+
+class AIChatMessage(Base):
+    """AI Chat xabarlar"""
+
+    __tablename__ = "ai_chat_message"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+    session_id = Column(
+        PostgresUUID(as_uuid=True), ForeignKey("ai_chat_session.id"), nullable=False
+    )
+    role = Column(String, nullable=False)  # "user", "assistant"
+    content = Column(TEXT, nullable=False)
+
+    created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+
+
+class UserSettings(Base):
+    """User sozlamalari"""
+
+    __tablename__ = "user_settings"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("account.id"),
+        nullable=False,
+        unique=True,
+    )
+
+    # Notification settings
+    email_notifications = Column(Boolean, server_default="true", nullable=False)
+    sms_notifications = Column(Boolean, server_default="false", nullable=False)
+    push_notifications = Column(Boolean, server_default="true", nullable=False)
+
+    # Language & localization
+    language = Column(String, server_default="uz", nullable=False)
+    timezone = Column(String, server_default="Asia/Tashkent", nullable=False)
+
+    # Data retention
+    auto_delete_records_after_days = Column(
+        Integer, server_default="90", nullable=False
+    )
+
+    # STT Model preferences
+    preferred_stt_model = Column(String, server_default="mohirai", nullable=False)
+
+    created_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=text("now()"), nullable=False)

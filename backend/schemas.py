@@ -369,3 +369,151 @@ class FinalCallStatusResponse(BaseModel):
 
     client_name: t.Optional[str] = None
     deals: t.Optional[list[Deal]] = []
+
+
+# ========================================
+# Company Management Schemas
+# ========================================
+
+
+class CompanyCreate(BaseModel):
+    name: str
+    description: t.Optional[str] = None
+    parent_company_id: t.Optional[UUID] = None
+
+
+class CompanyUpdate(BaseModel):
+    name: t.Optional[str] = None
+    description: t.Optional[str] = None
+    is_active: t.Optional[bool] = None
+
+
+class Company(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    description: t.Optional[str] = None
+    is_active: bool
+    parent_company_id: t.Optional[UUID] = None
+    hierarchy_level: int
+    settings: t.Optional[dict] = None
+    balance: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class UserTransferRequest(BaseModel):
+    user_id: UUID
+    from_company_id: UUID
+
+
+class CompanyAdministrator(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    company_id: UUID
+    user_id: UUID
+    permissions: t.Optional[dict] = None
+    created_at: datetime
+
+
+# ========================================
+# User Management Enhancement Schemas
+# ========================================
+
+
+class UserUpdateRequest(BaseModel):
+    email: t.Optional[str] = None
+    username: t.Optional[str] = None
+    role: t.Optional[str] = None
+    company_id: t.Optional[UUID] = None
+    is_active: t.Optional[bool] = None
+    is_blocked: t.Optional[bool] = None
+    preferred_language: t.Optional[str] = None
+
+
+# ========================================
+# Settings Schemas
+# ========================================
+
+
+class UserSettings(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_id: UUID
+    email_notifications: bool
+    sms_notifications: bool
+    push_notifications: bool
+    language: str
+    timezone: str
+    auto_delete_records_after_days: int
+    preferred_stt_model: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class UserSettingsUpdate(BaseModel):
+    email_notifications: t.Optional[bool] = None
+    sms_notifications: t.Optional[bool] = None
+    push_notifications: t.Optional[bool] = None
+    language: t.Optional[str] = None
+    timezone: t.Optional[str] = None
+    auto_delete_records_after_days: t.Optional[int] = None
+    preferred_stt_model: t.Optional[str] = None
+
+
+# ========================================
+# AI Chat Schemas
+# ========================================
+
+
+class AIChatSession(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_id: UUID
+    record_id: UUID
+    session_data: t.Optional[dict] = None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class AIChatMessage(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    session_id: UUID
+    role: str
+    content: str
+    created_at: datetime
+
+
+class AIChatMessageRequest(BaseModel):
+    message: str
+
+
+class ChatSessionResponse(BaseModel):
+    session_id: str
+    remaining_questions: int
+
+
+# ========================================
+# Activity Log Schemas
+# ========================================
+
+
+class ActivityLog(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_id: UUID
+    action: str
+    resource_type: str
+    resource_id: UUID
+    details: t.Optional[dict] = None
+    ip_address: t.Optional[str] = None
+    user_agent: t.Optional[str] = None
+    created_at: datetime
