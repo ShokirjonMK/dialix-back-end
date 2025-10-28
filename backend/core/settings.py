@@ -55,3 +55,15 @@ CHECKLIST_PROMPT_PRICE_PER_MS: float = 360 / 60 / 1000 * 100
 # slowing down startup process.
 # currently, I may not need this module
 ANTI_SLOW_DOWN: bool = config("ANTI_SLOW_DOWN", cast=bool, default=False)
+
+###
+# Redis Configuration
+###
+REDIS_URL: str = config("REDIS_URL", default="redis://localhost:6379/0")
+REDIS_CACHE_TTL: int = config("REDIS_CACHE_TTL", cast=int, default=300)  # 5 minutes
+
+###
+# Monitoring & Observability
+###
+ENABLE_APM: bool = config("ENABLE_APM", cast=bool, default=False)
+SENTRY_DSN: str = config("SENTRY_DSN", default="")

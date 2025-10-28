@@ -11,6 +11,7 @@ from backend.routers.settings import settings_router
 from backend.routers.ai_chat import ai_chat_router
 from backend.routers.activity_log import activity_log_router
 from backend.routers.company import company_router
+from backend.routers.health import health_router
 
 __all__ = ["routers"]
 
@@ -29,4 +30,6 @@ routers: list[APIRouter] = [
     ai_chat_router,
     activity_log_router,
     company_router,
+    # monitoring
+    health_router,
 ]

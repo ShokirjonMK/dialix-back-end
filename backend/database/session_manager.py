@@ -11,8 +11,23 @@ from backend.core import settings
 
 class DatabaseSessionManager:
     def __init__(self, host: str, engine_kwargs: dict[str, t.Any] = {}):
-        self._engine = create_engine(host, **engine_kwargs)
-        self._sessionmaker = sessionmaker(autocommit=False, bind=self._engine)
+        # Optimized connection pooling
+        optimized_kwargs = {
+            "pool_size": 10,  # Connection pool size
+            "max_overflow": 20,  # Max connections beyond pool_size
+            "pool_pre_ping": True,  # Verify connections before use
+            "pool_recycle": 3600,  # Recycle connections after 1 hour
+            "echo": engine_kwargs.get("echo", False),
+        }
+        optimized_kwargs.update(engine_kwargs)
+
+        self._engine = create_engine(host, **optimized_kwargs)
+        self._sessionmaker = sessionmaker(
+            autocommit=False,
+            autoflush=False,  # Optimize performance
+            bind=self._engine,
+            expire_on_commit=False,  # Cache model objects
+        )
 
     def close(self):
         if self._engine is None:
