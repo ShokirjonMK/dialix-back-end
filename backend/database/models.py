@@ -191,6 +191,31 @@ class BitrixCredentials(Base):
     webhook_url = Column(String, unique=True, nullable=False)
 
 
+class AmoCRMCredentials(Base):
+    __tablename__ = "amocrm_credentials"
+
+    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+
+    owner_id = Column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("account.id"),
+        nullable=False,
+        unique=True,
+    )
+
+    # Base URL like: https://<subdomain>.amocrm.ru
+    base_url = Column(String, unique=True, nullable=False)
+
+    # OAuth2 tokens (if provided manually for now)
+    access_token = Column(String, nullable=False)
+    refresh_token = Column(String, nullable=True)
+
+    # Optional OAuth2 client details for future token refresh automation
+    client_id = Column(String, nullable=True)
+    client_secret = Column(String, nullable=True)
+    redirect_uri = Column(String, nullable=True)
+
+
 class PbxCall(Base):
     """PBX qo'ng'iroqlari"""
 

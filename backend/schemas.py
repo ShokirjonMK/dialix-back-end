@@ -36,11 +36,21 @@ class BitrixCredentials(BaseModel):
     webhook_url: str
 
 
+class AmoCRMCredentials(BaseModel):
+    base_url: str
+    access_token: str
+    refresh_token: t.Optional[str] = None
+    client_id: t.Optional[str] = None
+    client_secret: t.Optional[str] = None
+    redirect_uri: t.Optional[str] = None
+
+
 class PutCredentials(BaseModel):
     owner_id: UUID
 
     pbx_credentials: t.Optional[PbxCredentialsFull] = None
     bitrix_credentials: t.Optional[BitrixCredentials] = None
+    amocrm_credentials: t.Optional[AmoCRMCredentials] = None
 
 
 class UserCreate(BaseModel):
@@ -54,6 +64,7 @@ class UserCreate(BaseModel):
     # optional credentials
     pbx_credentials: t.Optional[PbxCredentials] = None
     bitrix_credentials: t.Optional[BitrixCredentials] = None
+    amocrm_credentials: t.Optional[AmoCRMCredentials] = None
 
 
 class User(BaseModel):

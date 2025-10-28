@@ -23,6 +23,7 @@ from backend.services.user import create_user, get_user_by_id
 from backend.services.credentials import (
     insert_or_update_pbx_credential,
     insert_or_update_bitrix_credential,
+    insert_or_update_amocrm_credential,
 )
 
 from backend.core.dependencies.database import DatabaseSessionDependency
@@ -160,6 +161,13 @@ def put_credentials(
             db_session,
             put_credentials.owner_id,
             **put_credentials.model_dump()["bitrix_credentials"],
+        )
+
+    if put_credentials.amocrm_credentials:
+        insert_or_update_amocrm_credential(
+            db_session,
+            put_credentials.owner_id,
+            **put_credentials.model_dump()["amocrm_credentials"],
         )
 
     return JSONResponse(content={"success": True}, status_code=status.HTTP_200_OK)
